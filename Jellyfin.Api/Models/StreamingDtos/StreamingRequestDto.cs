@@ -1,4 +1,4 @@
-﻿using MediaBrowser.Controller.MediaEncoding;
+using MediaBrowser.Controller.MediaEncoding;
 
 namespace Jellyfin.Api.Models.StreamingDtos;
 

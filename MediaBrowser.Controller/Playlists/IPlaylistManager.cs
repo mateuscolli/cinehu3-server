@@ -66,9 +66,10 @@ namespace MediaBrowser.Controller.Playlists
         Task RemovePlaylistsAsync(Guid userId);
 
         /// <summary>
-        /// Saves a playlist.
+        /// Updates a playlist.
         /// </summary>
-        /// <param name="item">The playlist.</param>
-        void SavePlaylistFile(Playlist item);
+        /// <param name="playlist">The updated playlist.</param>
+        /// <returns>Task.</returns>
+        Task UpdatePlaylistAsync(Playlist playlist);
     }
 }

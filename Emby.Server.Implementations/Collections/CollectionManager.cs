@@ -112,8 +112,7 @@ namespace Emby.Server.Implementations.Collections
             return Path.Combine(_appPaths.DataPath, "collections");
         }
 
-        /// <inheritdoc />
-        public Task<Folder?> GetCollectionsFolder(bool createIfNeeded)
+        private Task<Folder?> GetCollectionsFolder(bool createIfNeeded)
         {
             return EnsureLibraryFolder(GetCollectionsFolderPath(), createIfNeeded);
         }

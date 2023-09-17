@@ -10,11 +10,8 @@ namespace MediaBrowser.MediaEncoding.Subtitles
     /// <summary>
     /// Subtitle writer for the WebVTT format.
     /// </summary>
-    public partial class VttWriter : ISubtitleWriter
+    public class VttWriter : ISubtitleWriter
     {
-        [GeneratedRegex(@"\\n", RegexOptions.IgnoreCase)]
-        private static partial Regex NewlineEscapeRegex();
-
         /// <inheritdoc />
         public void Write(SubtitleTrackInfo info, Stream stream, CancellationToken cancellationToken)
         {
@@ -42,7 +39,7 @@ namespace MediaBrowser.MediaEncoding.Subtitles
                     var text = trackEvent.Text;
 
                     // TODO: Not sure how to handle these
-                    text = NewlineEscapeRegex().Replace(text, " ");
+                    text = Regex.Replace(text, @"\\n", " ", RegexOptions.IgnoreCase);
 
                     writer.WriteLine(text);
                     writer.WriteLine();

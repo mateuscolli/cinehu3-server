@@ -26,8 +26,10 @@ namespace Jellyfin.Extensions
         /// <returns>All lines in the stream.</returns>
         public static string[] ReadAllLines(this Stream stream, Encoding encoding)
         {
-            using StreamReader reader = new StreamReader(stream, encoding);
-            return ReadAllLines(reader).ToArray();
+            using (StreamReader reader = new StreamReader(stream, encoding))
+            {
+                return ReadAllLines(reader).ToArray();
+            }
         }
 
         /// <summary>
@@ -38,7 +40,7 @@ namespace Jellyfin.Extensions
         public static IEnumerable<string> ReadAllLines(this TextReader reader)
         {
             string? line;
-            while ((line = reader.ReadLine()) is not null)
+            while ((line = reader.ReadLine()) != null)
             {
                 yield return line;
             }
@@ -52,7 +54,7 @@ namespace Jellyfin.Extensions
         public static async IAsyncEnumerable<string> ReadAllLinesAsync(this TextReader reader)
         {
             string? line;
-            while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) is not null)
+            while ((line = await reader.ReadLineAsync().ConfigureAwait(false)) != null)
             {
                 yield return line;
             }

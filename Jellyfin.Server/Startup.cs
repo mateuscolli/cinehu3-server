@@ -182,7 +182,7 @@ namespace Jellyfin.Server
 
                 // This must be injected before any path related middleware.
                 mainApp.UsePathTrim();
-
+                mainApp.UseStaticFiles();
                 if (appConfig.HostWebClient())
                 {
                     var extensionProvider = new FileExtensionContentTypeProvider();
@@ -190,11 +190,6 @@ namespace Jellyfin.Server
                     // subtitles octopus requires .data, .mem files.
                     extensionProvider.Mappings.Add(".data", MediaTypeNames.Application.Octet);
                     extensionProvider.Mappings.Add(".mem", MediaTypeNames.Application.Octet);
-                    mainApp.UseDefaultFiles(new DefaultFilesOptions
-                    {
-                        FileProvider = new PhysicalFileProvider(_serverConfigurationManager.ApplicationPaths.WebPath),
-                        RequestPath = "/web"
-                    });
                     mainApp.UseStaticFiles(new StaticFileOptions
                     {
                         FileProvider = new PhysicalFileProvider(_serverConfigurationManager.ApplicationPaths.WebPath),
@@ -205,7 +200,6 @@ namespace Jellyfin.Server
                     mainApp.UseRobotsRedirection();
                 }
 
-                mainApp.UseStaticFiles();
                 mainApp.UseAuthentication();
                 mainApp.UseJellyfinApiSwagger(_serverConfigurationManager);
                 mainApp.UseQueryStringDecoding();
@@ -213,7 +207,7 @@ namespace Jellyfin.Server
                 mainApp.UseAuthorization();
 
                 mainApp.UseLanFiltering();
-                mainApp.UseIPBasedAccessValidation();
+                mainApp.UseIpBasedAccessValidation();
                 mainApp.UseWebSocketHandler();
                 mainApp.UseServerStartupMessage();
 

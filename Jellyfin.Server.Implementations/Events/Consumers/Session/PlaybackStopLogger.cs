@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Jellyfin.Data.Entities;
@@ -73,10 +73,7 @@ namespace Jellyfin.Server.Implementations.Events.Consumers.Session
                         GetItemName(item),
                         eventArgs.DeviceName),
                     notificationType,
-                    user.Id)
-                {
-                    ItemId = eventArgs.Item?.Id.ToString("N", CultureInfo.InvariantCulture),
-                })
+                    user.Id))
                 .ConfigureAwait(false);
         }
 

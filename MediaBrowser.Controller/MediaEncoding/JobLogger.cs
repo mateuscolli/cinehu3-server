@@ -20,12 +20,12 @@ namespace MediaBrowser.Controller.MediaEncoding
             _logger = logger;
         }
 
-        public async Task StartStreamingLog(EncodingJobInfo state, StreamReader reader, Stream target)
+        public async Task StartStreamingLog(EncodingJobInfo state, Stream source, Stream target)
         {
             try
             {
                 using (target)
-                using (reader)
+                using (var reader = new StreamReader(source))
                 {
                     while (!reader.EndOfStream && reader.BaseStream.CanRead)
                     {

@@ -129,13 +129,6 @@ namespace MediaBrowser.Controller.Entities
         public string Album { get; set; }
 
         /// <summary>
-        /// Gets or sets the LUFS value.
-        /// </summary>
-        /// <value>The LUFS Value.</value>
-        [JsonIgnore]
-        public float LUFS { get; set; }
-
-        /// <summary>
         /// Gets or sets the channel identifier.
         /// </summary>
         /// <value>The channel identifier.</value>
@@ -1244,6 +1237,14 @@ namespace MediaBrowser.Controller.Entities
             return RefreshMetadata(new MetadataRefreshOptions(new DirectoryService(FileSystem)), cancellationToken);
         }
 
+        protected virtual void TriggerOnRefreshStart()
+        {
+        }
+
+        protected virtual void TriggerOnRefreshComplete()
+        {
+        }
+
         /// <summary>
         /// Overrides the base implementation to refresh metadata for local trailers.
         /// </summary>
@@ -1252,6 +1253,8 @@ namespace MediaBrowser.Controller.Entities
         /// <returns>true if a provider reports we changed.</returns>
         public async Task<ItemUpdateType> RefreshMetadata(MetadataRefreshOptions options, CancellationToken cancellationToken)
         {
+            TriggerOnRefreshStart();
+
             var requiresSave = false;
 
             if (SupportsOwnedItems)
@@ -1271,14 +1274,21 @@ namespace MediaBrowser.Controller.Entities
                 }
             }
 
-            var refreshOptions = requiresSave
-                ? new MetadataRefreshOptions(options)
-                {
-                    ForceSave = true
-                }
-                : options;
+            try
+            {
+                var refreshOptions = requiresSave
+                    ? new MetadataRefreshOptions(options)
+                    {
+                        ForceSave = true
+                    }
+                    : options;
 
-            return await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+                return await ProviderManager.RefreshSingleItem(this, refreshOptions, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                TriggerOnRefreshComplete();
+            }
         }
 
         protected bool IsVisibleStandaloneInternal(User user, bool checkFolders)
@@ -1350,7 +1360,7 @@ namespace MediaBrowser.Controller.Entities
         private async Task<bool> RefreshExtras(BaseItem item, MetadataRefreshOptions options, IReadOnlyList<FileSystemMetadata> fileSystemChildren, CancellationToken cancellationToken)
         {
             var extras = LibraryManager.FindExtras(item, fileSystemChildren, options.DirectoryService).ToArray();
-            var newExtraIds = Array.ConvertAll(extras, x => x.Id);
+            var newExtraIds = extras.Select(i => i.Id).ToArray();
             var extrasChanged = !item.ExtraIds.SequenceEqual(newExtraIds);
 
             if (!extrasChanged && !options.ReplaceAllMetadata && options.MetadataRefreshMode != MetadataRefreshMode.FullRefresh)
@@ -1864,7 +1874,7 @@ namespace MediaBrowser.Controller.Entities
         /// <exception cref="ArgumentException">Backdrops should be accessed using Item.Backdrops.</exception>
         public bool HasImage(ImageType type, int imageIndex)
         {
-            return GetImageInfo(type, imageIndex) is not null;
+            return GetImageInfo(type, imageIndex) != null;
         }
 
         public void SetImage(ItemImageInfo image, int index)

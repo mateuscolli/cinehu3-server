@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaBrowser.MediaEncoding.Encoder
 {
-    public partial class EncoderValidator
+    public class EncoderValidator
     {
         private static readonly string[] _requiredDecoders = new[]
         {
@@ -52,7 +52,6 @@ namespace MediaBrowser.MediaEncoding.Encoder
         {
             "libx264",
             "libx265",
-            "libsvtav1",
             "mpeg4",
             "msmpeg4",
             "libvpx",
@@ -70,16 +69,12 @@ namespace MediaBrowser.MediaEncoding.Encoder
             "srt",
             "h264_amf",
             "hevc_amf",
-            "av1_amf",
             "h264_qsv",
             "hevc_qsv",
-            "av1_qsv",
             "h264_nvenc",
             "hevc_nvenc",
-            "av1_nvenc",
             "h264_vaapi",
             "hevc_vaapi",
-            "av1_vaapi",
             "h264_v4l2m2m",
             "h264_videotoolbox",
             "hevc_videotoolbox"
@@ -164,12 +159,6 @@ namespace MediaBrowser.MediaEncoding.Encoder
         public static Version MinVersion { get; } = new Version(4, 0);
 
         public static Version? MaxVersion { get; } = null;
-
-        [GeneratedRegex(@"^ffmpeg version n?((?:[0-9]+\.?)+)")]
-        private static partial Regex FfmpegVersionRegex();
-
-        [GeneratedRegex(@"((?<name>lib\w+)\s+(?<major>[0-9]+)\.\s*(?<minor>[0-9]+))", RegexOptions.Multiline)]
-        private static partial Regex LibraryRegex();
 
         public bool ValidateVersion()
         {
@@ -289,7 +278,7 @@ namespace MediaBrowser.MediaEncoding.Encoder
         internal Version? GetFFmpegVersionInternal(string output)
         {
             // For pre-built binaries the FFmpeg version should be mentioned at the very start of the output
-            var match = FfmpegVersionRegex().Match(output);
+            var match = Regex.Match(output, @"^ffmpeg version n?((?:[0-9]+\.?)+)");
 
             if (match.Success)
             {
@@ -337,7 +326,10 @@ namespace MediaBrowser.MediaEncoding.Encoder
         {
             var map = new Dictionary<string, Version>();
 
-            foreach (Match match in LibraryRegex().Matches(output))
+            foreach (Match match in Regex.Matches(
+                output,
+                @"((?<name>lib\w+)\s+(?<major>[0-9]+)\.\s*(?<minor>[0-9]+))",
+                RegexOptions.Multiline))
             {
                 var version = new Version(
                     int.Parse(match.Groups["major"].ValueSpan, CultureInfo.InvariantCulture),
@@ -553,8 +545,7 @@ namespace MediaBrowser.MediaEncoding.Encoder
 
         private string GetProcessOutput(string path, string arguments, bool readStdErr, string? testKey)
         {
-            var redirectStandardIn = !string.IsNullOrEmpty(testKey);
-            using (var process = new Process
+            using (var process = new Process()
             {
                 StartInfo = new ProcessStartInfo(path, arguments)
                 {
@@ -562,7 +553,7 @@ namespace MediaBrowser.MediaEncoding.Encoder
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden,
                     ErrorDialog = false,
-                    RedirectStandardInput = redirectStandardIn,
+                    RedirectStandardInput = !string.IsNullOrEmpty(testKey),
                     RedirectStandardOutput = true,
                     RedirectStandardError = true
                 }
@@ -572,14 +563,12 @@ namespace MediaBrowser.MediaEncoding.Encoder
 
                 process.Start();
 
-                if (redirectStandardIn)
+                if (!string.IsNullOrEmpty(testKey))
                 {
-                    using var writer = process.StandardInput;
-                    writer.Write(testKey);
+                    process.StandardInput.Write(testKey);
                 }
 
-                using var reader = readStdErr ? process.StandardError : process.StandardOutput;
-                return reader.ReadToEnd();
+                return readStdErr ? process.StandardError.ReadToEnd() : process.StandardOutput.ReadToEnd();
             }
         }
     }

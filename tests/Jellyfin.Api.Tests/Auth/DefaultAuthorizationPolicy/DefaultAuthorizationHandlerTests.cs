@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Security.Claims;
@@ -66,7 +66,7 @@ namespace Jellyfin.Api.Tests.Auth.DefaultAuthorizationPolicy
 
             _userManagerMock
                 .Setup(u => u.GetUserById(It.IsAny<Guid>()))
-                .Returns<User?>(null);
+                .Returns<User>(null);
 
             var claims = new[]
             {

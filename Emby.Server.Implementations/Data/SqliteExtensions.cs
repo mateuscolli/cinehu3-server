@@ -1,10 +1,11 @@
+#nullable disable
 #pragma warning disable CS1591
 
 using System;
 using System.Collections.Generic;
-using System.Data;
+using System.Diagnostics;
 using System.Globalization;
-using Microsoft.Data.Sqlite;
+using SQLitePCL.pretty;
 
 namespace Emby.Server.Implementations.Data
 {
@@ -51,29 +52,19 @@ namespace Emby.Server.Implementations.Data
             "yy-MM-dd"
         };
 
-        public static IEnumerable<SqliteDataReader> Query(this SqliteConnection sqliteConnection, string commandText)
+        public static void RunQueries(this SQLiteDatabaseConnection connection, string[] queries)
         {
-            if (sqliteConnection.State != ConnectionState.Open)
-            {
-                sqliteConnection.Open();
-            }
+            ArgumentNullException.ThrowIfNull(queries);
 
-            using var command = sqliteConnection.CreateCommand();
-            command.CommandText = commandText;
-            using (var reader = command.ExecuteReader())
+            connection.RunInTransaction(conn =>
             {
-                while (reader.Read())
-                {
-                    yield return reader;
-                }
-            }
+                conn.ExecuteAll(string.Join(';', queries));
+            });
         }
 
-        public static void Execute(this SqliteConnection sqliteConnection, string commandText)
+        public static Guid ReadGuidFromBlob(this ResultSetValue result)
         {
-            using var command = sqliteConnection.CreateCommand();
-            command.CommandText = commandText;
-            command.ExecuteNonQuery();
+            return new Guid(result.ToBlob());
         }
 
         public static string ToDateTimeParamValue(this DateTime dateValue)
@@ -92,15 +83,27 @@ namespace Emby.Server.Implementations.Data
         private static string GetDateTimeKindFormat(DateTimeKind kind)
             => (kind == DateTimeKind.Utc) ? DatetimeFormatUtc : DatetimeFormatLocal;
 
-        public static bool TryReadDateTime(this SqliteDataReader reader, int index, out DateTime result)
+        public static DateTime ReadDateTime(this ResultSetValue result)
         {
-            if (reader.IsDBNull(index))
+            var dateText = result.ToString();
+
+            return DateTime.ParseExact(
+                dateText,
+                _datetimeFormats,
+                DateTimeFormatInfo.InvariantInfo,
+                DateTimeStyles.AdjustToUniversal);
+        }
+
+        public static bool TryReadDateTime(this IReadOnlyList<ResultSetValue> reader, int index, out DateTime result)
+        {
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            var dateText = reader.GetString(index);
+            var dateText = item.ToString();
 
             if (DateTime.TryParseExact(dateText, _datetimeFormats, DateTimeFormatInfo.InvariantInfo, DateTimeStyles.AdjustToUniversal, out var dateTimeResult))
             {
@@ -112,145 +115,335 @@ namespace Emby.Server.Implementations.Data
             return false;
         }
 
-        public static bool TryGetGuid(this SqliteDataReader reader, int index, out Guid result)
+        public static bool TryGetGuid(this IReadOnlyList<ResultSetValue> reader, int index, out Guid result)
         {
-            if (reader.IsDBNull(index))
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetGuid(index);
+            result = item.ReadGuidFromBlob();
             return true;
         }
 
-        public static bool TryGetString(this SqliteDataReader reader, int index, out string result)
+        public static bool IsDbNull(this ResultSetValue result)
         {
-            result = string.Empty;
+            return result.SQLiteType == SQLiteType.Null;
+        }
 
-            if (reader.IsDBNull(index))
+        public static string GetString(this IReadOnlyList<ResultSetValue> result, int index)
+        {
+            return result[index].ToString();
+        }
+
+        public static bool TryGetString(this IReadOnlyList<ResultSetValue> reader, int index, out string result)
+        {
+            result = null;
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 return false;
             }
 
-            result = reader.GetString(index);
+            result = item.ToString();
             return true;
         }
 
-        public static bool TryGetBoolean(this SqliteDataReader reader, int index, out bool result)
+        public static bool GetBoolean(this IReadOnlyList<ResultSetValue> result, int index)
         {
-            if (reader.IsDBNull(index))
+            return result[index].ToBool();
+        }
+
+        public static bool TryGetBoolean(this IReadOnlyList<ResultSetValue> reader, int index, out bool result)
+        {
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetBoolean(index);
+            result = item.ToBool();
             return true;
         }
 
-        public static bool TryGetInt32(this SqliteDataReader reader, int index, out int result)
+        public static bool TryGetInt32(this IReadOnlyList<ResultSetValue> reader, int index, out int result)
         {
-            if (reader.IsDBNull(index))
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetInt32(index);
+            result = item.ToInt();
             return true;
         }
 
-        public static bool TryGetInt64(this SqliteDataReader reader, int index, out long result)
+        public static long GetInt64(this IReadOnlyList<ResultSetValue> result, int index)
         {
-            if (reader.IsDBNull(index))
+            return result[index].ToInt64();
+        }
+
+        public static bool TryGetInt64(this IReadOnlyList<ResultSetValue> reader, int index, out long result)
+        {
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetInt64(index);
+            result = item.ToInt64();
             return true;
         }
 
-        public static bool TryGetSingle(this SqliteDataReader reader, int index, out float result)
+        public static bool TryGetSingle(this IReadOnlyList<ResultSetValue> reader, int index, out float result)
         {
-            if (reader.IsDBNull(index))
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetFloat(index);
+            result = item.ToFloat();
             return true;
         }
 
-        public static bool TryGetDouble(this SqliteDataReader reader, int index, out double result)
+        public static bool TryGetDouble(this IReadOnlyList<ResultSetValue> reader, int index, out double result)
         {
-            if (reader.IsDBNull(index))
+            var item = reader[index];
+            if (item.IsDbNull())
             {
                 result = default;
                 return false;
             }
 
-            result = reader.GetDouble(index);
+            result = item.ToDouble();
             return true;
         }
 
-        public static void TryBind(this SqliteCommand statement, string name, Guid value)
+        public static Guid GetGuid(this IReadOnlyList<ResultSetValue> result, int index)
         {
-            statement.TryBind(name, value, true);
+            return result[index].ReadGuidFromBlob();
         }
 
-        public static void TryBind(this SqliteCommand statement, string name, object? value, bool isBlob = false)
+        [Conditional("DEBUG")]
+        private static void CheckName(string name)
         {
-            var preparedValue = value ?? DBNull.Value;
-            if (statement.Parameters.Contains(name))
+            throw new ArgumentException("Invalid param name: " + name, nameof(name));
+        }
+
+        public static void TryBind(this IStatement statement, string name, double value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
             {
-                statement.Parameters[name].Value = preparedValue;
+                bindParam.Bind(value);
             }
             else
             {
-                // Blobs aren't always detected automatically
-                if (isBlob)
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, string value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                if (value is null)
                 {
-                    statement.Parameters.Add(new SqliteParameter(name, SqliteType.Blob) { Value = value });
+                    bindParam.BindNull();
                 }
                 else
                 {
-                    statement.Parameters.AddWithValue(name, preparedValue);
+                    bindParam.Bind(value);
                 }
             }
-        }
-
-        public static void TryBindNull(this SqliteCommand statement, string name)
-        {
-            statement.TryBind(name, DBNull.Value);
-        }
-
-        public static IEnumerable<SqliteDataReader> ExecuteQuery(this SqliteCommand command)
-        {
-            using (var reader = command.ExecuteReader())
+            else
             {
-                while (reader.Read())
-                {
-                    yield return reader;
-                }
+                CheckName(name);
             }
         }
 
-        public static int SelectScalarInt(this SqliteCommand command)
+        public static void TryBind(this IStatement statement, string name, bool value)
         {
-            var result = command.ExecuteScalar();
-            // Can't be null since the method is used to retrieve Count
-            return Convert.ToInt32(result!, CultureInfo.InvariantCulture);
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value);
+            }
+            else
+            {
+                CheckName(name);
+            }
         }
 
-        public static SqliteCommand PrepareStatement(this SqliteConnection sqliteConnection, string sql)
+        public static void TryBind(this IStatement statement, string name, float value)
         {
-            var command = sqliteConnection.CreateCommand();
-            command.CommandText = sql;
-            return command;
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value);
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, int value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value);
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, Guid value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                Span<byte> byteValue = stackalloc byte[16];
+                value.TryWriteBytes(byteValue);
+                bindParam.Bind(byteValue);
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, DateTime value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value.ToDateTimeParamValue());
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, long value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value);
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, ReadOnlySpan<byte> value)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.Bind(value);
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBindNull(this IStatement statement, string name)
+        {
+            if (statement.BindParameters.TryGetValue(name, out IBindParameter bindParam))
+            {
+                bindParam.BindNull();
+            }
+            else
+            {
+                CheckName(name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, DateTime? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, Guid? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, double? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, int? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, float? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static void TryBind(this IStatement statement, string name, bool? value)
+        {
+            if (value.HasValue)
+            {
+                TryBind(statement, name, value.Value);
+            }
+            else
+            {
+                TryBindNull(statement, name);
+            }
+        }
+
+        public static IEnumerable<IReadOnlyList<ResultSetValue>> ExecuteQuery(this IStatement statement)
+        {
+            while (statement.MoveNext())
+            {
+                yield return statement.Current;
+            }
         }
     }
 }

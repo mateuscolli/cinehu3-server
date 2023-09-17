@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace MediaBrowser.Model.Dlna
 {
-    public partial class SearchCriteria
+    public class SearchCriteria
     {
         public SearchCriteria(string search)
         {
@@ -13,10 +13,10 @@ namespace MediaBrowser.Model.Dlna
 
             SearchType = SearchType.Unknown;
 
-            string[] factors = AndOrRegex().Split(search);
+            string[] factors = RegexSplit(search, "(and|or)");
             foreach (string factor in factors)
             {
-                string[] subFactors = WhiteSpaceRegex().Split(factor.Trim().Trim('(').Trim(')').Trim(), 3);
+                string[] subFactors = RegexSplit(factor.Trim().Trim('(').Trim(')').Trim(), "\\s", 3);
 
                 if (subFactors.Length == 3)
                 {
@@ -46,10 +46,27 @@ namespace MediaBrowser.Model.Dlna
 
         public SearchType SearchType { get; set; }
 
-        [GeneratedRegex("\\s")]
-        private static partial Regex WhiteSpaceRegex();
+        /// <summary>
+        /// Splits the specified string.
+        /// </summary>
+        /// <param name="str">The string.</param>
+        /// <param name="term">The term.</param>
+        /// <param name="limit">The limit.</param>
+        /// <returns>System.String[].</returns>
+        private static string[] RegexSplit(string str, string term, int limit)
+        {
+            return new Regex(term).Split(str, limit);
+        }
 
-        [GeneratedRegex("(and|or)", RegexOptions.IgnoreCase)]
-        private static partial Regex AndOrRegex();
+        /// <summary>
+        /// Splits the specified string.
+        /// </summary>
+        /// <param name="str">The string.</param>
+        /// <param name="term">The term.</param>
+        /// <returns>System.String[].</returns>
+        private static string[] RegexSplit(string str, string term)
+        {
+            return Regex.Split(str, term, RegexOptions.IgnoreCase);
+        }
     }
 }

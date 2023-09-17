@@ -6,8 +6,9 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Api.Extensions;
 using MediaBrowser.Controller.Net;
-using MediaBrowser.Controller.Net.WebSocketMessages.Outbound;
 using MediaBrowser.Controller.Session;
+using MediaBrowser.Model.Net;
+using MediaBrowser.Model.Session;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
@@ -307,7 +308,11 @@ namespace Emby.Server.Implementations.Session
         private Task SendForceKeepAlive(IWebSocketConnection webSocket)
         {
             return webSocket.SendAsync(
-                new ForceKeepAliveMessage(WebSocketLostTimeout),
+                new WebSocketMessage<int>
+                {
+                    MessageType = SessionMessageType.ForceKeepAlive,
+                    Data = WebSocketLostTimeout
+                },
                 CancellationToken.None);
         }
 

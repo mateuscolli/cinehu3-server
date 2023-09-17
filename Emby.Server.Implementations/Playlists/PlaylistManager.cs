@@ -67,8 +67,9 @@ namespace Emby.Server.Implementations.Playlists
         public async Task<PlaylistCreationResult> CreatePlaylist(PlaylistCreationRequest options)
         {
             var name = options.Name;
+
             var folderName = _fileSystem.GetValidFilename(name);
-            var parentFolder = GetPlaylistsFolder(options.UserId);
+            var parentFolder = GetPlaylistsFolder(Guid.Empty);
             if (parentFolder is null)
             {
                 throw new ArgumentException(nameof(parentFolder));
@@ -79,6 +80,7 @@ namespace Emby.Server.Implementations.Playlists
                 foreach (var itemId in options.ItemIdList)
                 {
                     var item = _libraryManager.GetItemById(itemId);
+
                     if (item is null)
                     {
                         throw new ArgumentException("No item exists with the supplied Id");
@@ -119,6 +121,7 @@ namespace Emby.Server.Implementations.Playlists
             }
 
             var user = _userManager.GetUserById(options.UserId);
+
             var path = Path.Combine(parentFolder.Path, folderName);
             path = GetTargetPath(path);
 
@@ -127,6 +130,7 @@ namespace Emby.Server.Implementations.Playlists
             try
             {
                 Directory.CreateDirectory(path);
+
                 var playlist = new Playlist
                 {
                     Name = name,
@@ -136,6 +140,7 @@ namespace Emby.Server.Implementations.Playlists
                 };
 
                 playlist.SetMediaType(options.MediaType);
+
                 parentFolder.AddChild(playlist);
 
                 await playlist.RefreshMetadata(new MetadataRefreshOptions(new DirectoryService(_fileSystem)) { ForceSave = true }, CancellationToken.None)
@@ -321,8 +326,7 @@ namespace Emby.Server.Implementations.Playlists
             }
         }
 
-        /// <inheritdoc />
-        public void SavePlaylistFile(Playlist item)
+        private void SavePlaylistFile(Playlist item)
         {
             // this is probably best done as a metadata provider
             // saving a file over itself will require some work to prevent this from happening when not needed
@@ -558,6 +562,21 @@ namespace Emby.Server.Implementations.Playlists
                         playlist.GetParent(),
                         false);
                 }
+            }
+        }
+
+        /// <inheritdoc />
+        public async Task UpdatePlaylistAsync(Playlist playlist)
+        {
+            var currentPlaylist = (Playlist)_libraryManager.GetItemById(playlist.Id);
+            currentPlaylist.OwnerUserId = playlist.OwnerUserId;
+            currentPlaylist.Shares = playlist.Shares;
+
+            await playlist.UpdateToRepositoryAsync(ItemUpdateType.MetadataEdit, CancellationToken.None).ConfigureAwait(false);
+
+            if (currentPlaylist.IsFile)
+            {
+                SavePlaylistFile(currentPlaylist);
             }
         }
     }

@@ -15,6 +15,7 @@ using MediaBrowser.Model.IO;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Serilog;
+using SQLitePCL;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace Jellyfin.Server.Helpers;
@@ -296,5 +297,7 @@ public static class StartupHelpers
         // Disable the "Expect: 100-Continue" header by default
         // http://stackoverflow.com/questions/566437/http-post-returns-the-error-417-expectation-failed-c
         ServicePointManager.Expect100Continue = false;
+
+        Batteries_V2.Init();
     }
 }

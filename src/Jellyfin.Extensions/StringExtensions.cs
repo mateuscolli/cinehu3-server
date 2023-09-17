@@ -6,13 +6,11 @@ namespace Jellyfin.Extensions
     /// <summary>
     /// Provides extensions methods for <see cref="string" />.
     /// </summary>
-    public static partial class StringExtensions
+    public static class StringExtensions
     {
         // Matches non-conforming unicode chars
         // https://mnaoumov.wordpress.com/2014/06/14/stripping-invalid-characters-from-utf-16-strings/
-
-        [GeneratedRegex("([\ud800-\udbff](?![\udc00-\udfff]))|((?<![\ud800-\udbff])[\udc00-\udfff])|(�)")]
-        private static partial Regex NonConformingUnicodeRegex();
+        private static readonly Regex _nonConformingUnicode = new Regex("([\ud800-\udbff](?![\udc00-\udfff]))|((?<![\ud800-\udbff])[\udc00-\udfff])|(\ufffd)", RegexOptions.Compiled);
 
         /// <summary>
         /// Removes the diacritics character from the strings.
@@ -21,7 +19,7 @@ namespace Jellyfin.Extensions
         /// <returns>The string without diacritics character.</returns>
         public static string RemoveDiacritics(this string text)
             => Diacritics.Extensions.StringExtensions.RemoveDiacritics(
-                NonConformingUnicodeRegex().Replace(text, string.Empty));
+                _nonConformingUnicode.Replace(text, string.Empty));
 
         /// <summary>
         /// Checks whether or not the specified string has diacritics in it.
@@ -30,7 +28,7 @@ namespace Jellyfin.Extensions
         /// <returns>True if the string has diacritics, false otherwise.</returns>
         public static bool HasDiacritics(this string text)
             => Diacritics.Extensions.StringExtensions.HasDiacritics(text)
-                || NonConformingUnicodeRegex().IsMatch(text);
+                || _nonConformingUnicode.IsMatch(text);
 
         /// <summary>
         /// Counts the number of occurrences of [needle] in the string.

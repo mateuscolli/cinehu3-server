@@ -1,15 +1,10 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
 using Emby.Server.Implementations.Udp;
 using Jellyfin.Networking.Configuration;
-using Jellyfin.Networking.Extensions;
 using MediaBrowser.Common.Configuration;
-using MediaBrowser.Common.Net;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.Configuration;
@@ -34,13 +29,11 @@ namespace Emby.Server.Implementations.EntryPoints
         private readonly IServerApplicationHost _appHost;
         private readonly IConfiguration _config;
         private readonly IConfigurationManager _configurationManager;
-        private readonly INetworkManager _networkManager;
-        private readonly bool _enableMultiSocketBinding;
 
         /// <summary>
         /// The UDP server.
         /// </summary>
-        private List<UdpServer> _udpServers;
+        private UdpServer? _udpServer;
         private CancellationTokenSource _cancellationTokenSource = new CancellationTokenSource();
         private bool _disposed = false;
 
@@ -51,21 +44,16 @@ namespace Emby.Server.Implementations.EntryPoints
         /// <param name="appHost">Instance of the <see cref="IServerApplicationHost"/> interface.</param>
         /// <param name="configuration">Instance of the <see cref="IConfiguration"/> interface.</param>
         /// <param name="configurationManager">Instance of the <see cref="IConfigurationManager"/> interface.</param>
-        /// <param name="networkManager">Instance of the <see cref="INetworkManager"/> interface.</param>
         public UdpServerEntryPoint(
             ILogger<UdpServerEntryPoint> logger,
             IServerApplicationHost appHost,
             IConfiguration configuration,
-            IConfigurationManager configurationManager,
-            INetworkManager networkManager)
+            IConfigurationManager configurationManager)
         {
             _logger = logger;
             _appHost = appHost;
             _config = configuration;
             _configurationManager = configurationManager;
-            _networkManager = networkManager;
-            _udpServers = new List<UdpServer>();
-            _enableMultiSocketBinding = OperatingSystem.IsWindows() || OperatingSystem.IsLinux();
         }
 
         /// <inheritdoc />
@@ -80,32 +68,8 @@ namespace Emby.Server.Implementations.EntryPoints
 
             try
             {
-                if (_enableMultiSocketBinding)
-                {
-                    // Add global broadcast socket
-                    var server = new UdpServer(_logger, _appHost, _config, IPAddress.Broadcast, PortNumber);
-                    server.Start(_cancellationTokenSource.Token);
-                    _udpServers.Add(server);
-
-                    // Add bind address specific broadcast sockets
-                    // IPv6 is currently unsupported
-                    var validInterfaces = _networkManager.GetInternalBindAddresses().Where(i => i.AddressFamily == AddressFamily.InterNetwork);
-                    foreach (var intf in validInterfaces)
-                    {
-                        var broadcastAddress = NetworkExtensions.GetBroadcastAddress(intf.Subnet);
-                        _logger.LogDebug("Binding UDP server to {Address} on port {PortNumber}", broadcastAddress, PortNumber);
-
-                        server = new UdpServer(_logger, _appHost, _config, broadcastAddress, PortNumber);
-                        server.Start(_cancellationTokenSource.Token);
-                        _udpServers.Add(server);
-                    }
-                }
-                else
-                {
-                    var server = new UdpServer(_logger, _appHost, _config, IPAddress.Any, PortNumber);
-                    server.Start(_cancellationTokenSource.Token);
-                    _udpServers.Add(server);
-                }
+                _udpServer = new UdpServer(_logger, _appHost, _config, PortNumber);
+                _udpServer.Start(_cancellationTokenSource.Token);
             }
             catch (SocketException ex)
             {
@@ -133,12 +97,9 @@ namespace Emby.Server.Implementations.EntryPoints
 
             _cancellationTokenSource.Cancel();
             _cancellationTokenSource.Dispose();
-            foreach (var server in _udpServers)
-            {
-                server.Dispose();
-            }
+            _udpServer?.Dispose();
+            _udpServer = null;
 
-            _udpServers.Clear();
             _disposed = true;
         }
     }

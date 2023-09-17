@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Jellyfin.Api.Models.UserDtos;
 
@@ -11,7 +11,7 @@ public class CreateUserByName
     /// Gets or sets the username.
     /// </summary>
     [Required]
-    public required string Name { get; set; }
+    required public string Name { get; set; }
 
     /// <summary>
     /// Gets or sets the password.

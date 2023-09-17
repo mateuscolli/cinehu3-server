@@ -73,11 +73,7 @@ namespace Emby.Dlna.Ssdp
             {
                 if (_listenerCount > 0 && _deviceLocator is null && _commsServer is not null)
                 {
-                    _deviceLocator = new SsdpDeviceLocator(
-                        _commsServer,
-                        Environment.OSVersion.Platform.ToString(),
-                        // Can not use VersionString here since that includes OS and version
-                        Environment.OSVersion.Version.ToString());
+                    _deviceLocator = new SsdpDeviceLocator(_commsServer);
 
                     // (Optional) Set the filter so we only see notifications for devices we care about
                     // (can be any search target value i.e device type, uuid value etc - any value that appears in the
@@ -110,7 +106,7 @@ namespace Emby.Dlna.Ssdp
                 {
                     Location = e.DiscoveredDevice.DescriptionLocation,
                     Headers = headers,
-                    RemoteIPAddress = e.RemoteIPAddress
+                    RemoteIpAddress = e.RemoteIpAddress
                 });
 
             DeviceDiscoveredInternal?.Invoke(this, args);

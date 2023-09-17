@@ -9,10 +9,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using Jellyfin.Extensions.Json;
 using MediaBrowser.Controller.Net;
-using MediaBrowser.Controller.Net.WebSocketMessages;
-using MediaBrowser.Controller.Net.WebSocketMessages.Outbound;
+using MediaBrowser.Model.Net;
 using MediaBrowser.Model.Session;
-using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Emby.Server.Implementations.HttpServer
@@ -44,17 +42,14 @@ namespace Emby.Server.Implementations.HttpServer
         /// </summary>
         /// <param name="logger">The logger.</param>
         /// <param name="socket">The socket.</param>
-        /// <param name="authorizationInfo">The authorization information.</param>
         /// <param name="remoteEndPoint">The remote end point.</param>
         public WebSocketConnection(
             ILogger<WebSocketConnection> logger,
             WebSocket socket,
-            AuthorizationInfo authorizationInfo,
             IPAddress? remoteEndPoint)
         {
             _logger = logger;
             _socket = socket;
-            AuthorizationInfo = authorizationInfo;
             RemoteEndPoint = remoteEndPoint;
 
             _jsonOptions = JsonDefaults.Options;
@@ -64,40 +59,47 @@ namespace Emby.Server.Implementations.HttpServer
         /// <inheritdoc />
         public event EventHandler<EventArgs>? Closed;
 
-        /// <inheritdoc />
-        public AuthorizationInfo AuthorizationInfo { get; }
-
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets the remote end point.
+        /// </summary>
         public IPAddress? RemoteEndPoint { get; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets or sets the receive action.
+        /// </summary>
+        /// <value>The receive action.</value>
         public Func<WebSocketMessageInfo, Task>? OnReceive { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets the last activity date.
+        /// </summary>
+        /// <value>The last activity date.</value>
         public DateTime LastActivityDate { get; private set; }
 
         /// <inheritdoc />
         public DateTime LastKeepAliveDate { get; set; }
 
-        /// <inheritdoc />
+        /// <summary>
+        /// Gets the state.
+        /// </summary>
+        /// <value>The state.</value>
         public WebSocketState State => _socket.State;
 
-        /// <inheritdoc />
-        public Task SendAsync(OutboundWebSocketMessage message, CancellationToken cancellationToken)
+        /// <summary>
+        /// Sends a message asynchronously.
+        /// </summary>
+        /// <typeparam name="T">The type of the message.</typeparam>
+        /// <param name="message">The message.</param>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>Task.</returns>
+        public Task SendAsync<T>(WebSocketMessage<T> message, CancellationToken cancellationToken)
         {
             var json = JsonSerializer.SerializeToUtf8Bytes(message, _jsonOptions);
             return _socket.SendAsync(json, WebSocketMessageType.Text, true, cancellationToken);
         }
 
         /// <inheritdoc />
-        public Task SendAsync<T>(OutboundWebSocketMessage<T> message, CancellationToken cancellationToken)
-        {
-            var json = JsonSerializer.SerializeToUtf8Bytes(message, _jsonOptions);
-            return _socket.SendAsync(json, WebSocketMessageType.Text, true, cancellationToken);
-        }
-
-        /// <inheritdoc />
-        public async Task ReceiveAsync(CancellationToken cancellationToken = default)
+        public async Task ProcessAsync(CancellationToken cancellationToken = default)
         {
             var pipe = new Pipe();
             var writer = pipe.Writer;
@@ -169,7 +171,7 @@ namespace Emby.Server.Implementations.HttpServer
                 return;
             }
 
-            InboundWebSocketMessage<object>? stub;
+            WebSocketMessage<object>? stub;
             long bytesConsumed;
             try
             {
@@ -210,10 +212,10 @@ namespace Emby.Server.Implementations.HttpServer
             }
         }
 
-        internal InboundWebSocketMessage<object>? DeserializeWebSocketMessage(ReadOnlySequence<byte> bytes, out long bytesConsumed)
+        internal WebSocketMessage<object>? DeserializeWebSocketMessage(ReadOnlySequence<byte> bytes, out long bytesConsumed)
         {
             var jsonReader = new Utf8JsonReader(bytes);
-            var ret = JsonSerializer.Deserialize<InboundWebSocketMessage<object>>(ref jsonReader, _jsonOptions);
+            var ret = JsonSerializer.Deserialize<WebSocketMessage<object>>(ref jsonReader, _jsonOptions);
             bytesConsumed = jsonReader.BytesConsumed;
             return ret;
         }
@@ -222,7 +224,11 @@ namespace Emby.Server.Implementations.HttpServer
         {
             LastKeepAliveDate = DateTime.UtcNow;
             return SendAsync(
-                new OutboundKeepAliveMessage(),
+                new WebSocketMessage<string>
+                {
+                    MessageId = Guid.NewGuid(),
+                    MessageType = SessionMessageType.KeepAlive
+                },
                 CancellationToken.None);
         }
 

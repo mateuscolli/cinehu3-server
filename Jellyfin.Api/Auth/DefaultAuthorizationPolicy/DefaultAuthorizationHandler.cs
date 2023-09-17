@@ -1,4 +1,4 @@
-﻿using System.Threading.Tasks;
+using System.Threading.Tasks;
 using Jellyfin.Api.Constants;
 using Jellyfin.Api.Extensions;
 using Jellyfin.Data.Enums;
@@ -54,7 +54,7 @@ namespace Jellyfin.Api.Auth.DefaultAuthorizationPolicy
             }
 
             var isInLocalNetwork = _httpContextAccessor.HttpContext is not null
-                                   && _networkManager.IsInLocalNetwork(_httpContextAccessor.HttpContext.GetNormalizedRemoteIP());
+                                   && _networkManager.IsInLocalNetwork(_httpContextAccessor.HttpContext.GetNormalizedRemoteIp());
             var user = _userManager.GetUserById(userId);
             if (user is null)
             {

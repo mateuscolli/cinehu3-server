@@ -1,11 +1,10 @@
 using System;
 using System.Globalization;
 using System.IO;
-using System.Linq;
-using Emby.Server.Implementations.Data;
+
 using MediaBrowser.Controller;
-using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
+using SQLitePCL.pretty;
 
 namespace Jellyfin.Server.Migrations.Routines
 {
@@ -38,12 +37,14 @@ namespace Jellyfin.Server.Migrations.Routines
         {
             var dataPath = _paths.DataPath;
             var dbPath = Path.Combine(dataPath, DbFilename);
-            using (var connection = new SqliteConnection($"Filename={dbPath}"))
-            using (var transaction = connection.BeginTransaction())
+            using (var connection = SQLite3.Open(
+                dbPath,
+                ConnectionFlags.ReadWrite,
+                null))
             {
                 // Query the database for the ids of duplicate extras
                 var queryResult = connection.Query("SELECT t1.Path FROM TypedBaseItems AS t1, TypedBaseItems AS t2 WHERE t1.Path=t2.Path AND t1.Type!=t2.Type AND t1.Type='MediaBrowser.Controller.Entities.Video'");
-                var bads = string.Join(", ", queryResult.Select(x => x.GetString(0)));
+                var bads = string.Join(", ", queryResult.SelectScalarString());
 
                 // Do nothing if no duplicate extras were detected
                 if (bads.Length == 0)
@@ -75,7 +76,6 @@ namespace Jellyfin.Server.Migrations.Routines
                 // Delete all duplicate extras
                 _logger.LogInformation("Removing found duplicated extras for the following items: {DuplicateExtras}", bads);
                 connection.Execute("DELETE FROM TypedBaseItems WHERE rowid IN (SELECT t1.rowid FROM TypedBaseItems AS t1, TypedBaseItems AS t2 WHERE t1.Path=t2.Path AND t1.Type!=t2.Type AND t1.Type='MediaBrowser.Controller.Entities.Video')");
-                transaction.Commit();
             }
         }
     }

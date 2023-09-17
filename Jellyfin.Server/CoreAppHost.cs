@@ -22,7 +22,6 @@ using MediaBrowser.Controller.Lyrics;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Security;
 using MediaBrowser.Model.Activity;
-using MediaBrowser.Providers.Lyric;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -92,11 +91,6 @@ namespace Jellyfin.Server
             foreach (var type in GetExportTypes<ILyricProvider>())
             {
                 serviceCollection.AddSingleton(typeof(ILyricProvider), type);
-            }
-
-            foreach (var type in GetExportTypes<ILyricParser>())
-            {
-                serviceCollection.AddSingleton(typeof(ILyricParser), type);
             }
 
             base.RegisterServices(serviceCollection);

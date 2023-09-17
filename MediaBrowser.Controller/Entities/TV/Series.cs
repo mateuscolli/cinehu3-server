@@ -28,15 +28,11 @@ namespace MediaBrowser.Controller.Entities.TV
         public Series()
         {
             AirDays = Array.Empty<DayOfWeek>();
-            SeasonNames = new Dictionary<int, string>();
         }
 
         public DayOfWeek[] AirDays { get; set; }
 
         public string AirTime { get; set; }
-
-        [JsonIgnore]
-        public Dictionary<int, string> SeasonNames { get; set; }
 
         [JsonIgnore]
         public override bool SupportsAddingToPlaylist => true;

@@ -17,12 +17,11 @@ fi
 # Modify changelog to unstable configuration if IS_UNSTABLE
 if [[ ${IS_UNSTABLE} == 'yes' ]]; then
     pushd debian
-    PR_ID=$( git log --grep 'Merge pull request' --oneline --single-worktree --first-parent | head -1 | grep --color=none -Eo '#[0-9]+' | tr -d '#' )
 
     cat <<EOF >changelog
-jellyfin-server (${BUILD_ID}-unstable) unstable; urgency=medium
+jellyfin-server (${BUILD_ID}) unstable; urgency=medium
 
-  * Jellyfin Server unstable build ${BUILD_ID} for merged PR #${PR_ID}
+  * New disk storage indicator on the dashboard.
 
  -- Jellyfin Packaging Team <packaging@jellyfin.org>  $( date --rfc-2822 )
 EOF

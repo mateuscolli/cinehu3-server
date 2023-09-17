@@ -183,9 +183,6 @@ namespace MediaBrowser.Controller.Entities.Audio
                 progress.Report(percent * 95);
             }
 
-            // get album LUFS
-            LUFS = items.OfType<Audio>().Max(item => item.LUFS);
-
             var parentRefreshOptions = refreshOptions;
             if (childUpdateType > ItemUpdateType.None)
             {

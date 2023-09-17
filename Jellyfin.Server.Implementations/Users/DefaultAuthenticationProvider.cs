@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
 using Jellyfin.Data.Entities;
 using MediaBrowser.Controller.Authentication;
@@ -40,18 +39,14 @@ namespace Jellyfin.Server.Implementations.Users
 
         /// <inheritdoc />
         // This is the version that we need to use for local users. Because reasons.
-        public Task<ProviderAuthenticationResult> Authenticate(string username, string password, User? resolvedUser)
+        public Task<ProviderAuthenticationResult> Authenticate(string username, string password, User resolvedUser)
         {
-            [DoesNotReturn]
-            static void ThrowAuthenticationException()
-            {
-                throw new AuthenticationException("Invalid username or password");
-            }
-
             if (resolvedUser is null)
             {
-                ThrowAuthenticationException();
+                throw new AuthenticationException("Specified user does not exist.");
             }
+
+            bool success = false;
 
             // As long as jellyfin supports password-less users, we need this little block here to accommodate
             if (!HasPassword(resolvedUser) && string.IsNullOrEmpty(password))
@@ -65,13 +60,15 @@ namespace Jellyfin.Server.Implementations.Users
             // Handle the case when the stored password is null, but the user tried to login with a password
             if (resolvedUser.Password is null)
             {
-                ThrowAuthenticationException();
+                throw new AuthenticationException("Invalid username or password");
             }
 
             PasswordHash readyHash = PasswordHash.Parse(resolvedUser.Password);
-            if (!_cryptographyProvider.Verify(readyHash, password))
+            success = _cryptographyProvider.Verify(readyHash, password);
+
+            if (!success)
             {
-                ThrowAuthenticationException();
+                throw new AuthenticationException("Invalid username or password");
             }
 
             // Migrate old hashes to the new default

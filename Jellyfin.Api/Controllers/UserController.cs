@@ -134,7 +134,7 @@ public class UserController : BaseJellyfinApiController
             return NotFound("User not found");
         }
 
-        var result = _userManager.GetUserDto(user, HttpContext.GetNormalizedRemoteIP().ToString());
+        var result = _userManager.GetUserDto(user, HttpContext.GetNormalizedRemoteIp().ToString());
         return result;
     }
 
@@ -217,7 +217,7 @@ public class UserController : BaseJellyfinApiController
                 DeviceId = auth.DeviceId,
                 DeviceName = auth.Device,
                 Password = request.Pw,
-                RemoteEndPoint = HttpContext.GetNormalizedRemoteIP().ToString(),
+                RemoteEndPoint = HttpContext.GetNormalizedRemoteIp().ToString(),
                 Username = request.Username
             }).ConfigureAwait(false);
 
@@ -226,7 +226,7 @@ public class UserController : BaseJellyfinApiController
         catch (SecurityException e)
         {
             // rethrow adding IP address to message
-            throw new SecurityException($"[{HttpContext.GetNormalizedRemoteIP()}] {e.Message}", e);
+            throw new SecurityException($"[{HttpContext.GetNormalizedRemoteIp()}] {e.Message}", e);
         }
     }
 
@@ -248,7 +248,7 @@ public class UserController : BaseJellyfinApiController
         catch (SecurityException e)
         {
             // rethrow adding IP address to message
-            throw new SecurityException($"[{HttpContext.GetNormalizedRemoteIP()}] {e.Message}", e);
+            throw new SecurityException($"[{HttpContext.GetNormalizedRemoteIp()}] {e.Message}", e);
         }
     }
 
@@ -294,7 +294,7 @@ public class UserController : BaseJellyfinApiController
                     user.Username,
                     request.CurrentPw ?? string.Empty,
                     request.CurrentPw ?? string.Empty,
-                    HttpContext.GetNormalizedRemoteIP().ToString(),
+                    HttpContext.GetNormalizedRemoteIp().ToString(),
                     false).ConfigureAwait(false);
 
                 if (success is null)
@@ -323,16 +323,36 @@ public class UserController : BaseJellyfinApiController
     /// <response code="404">User not found.</response>
     /// <returns>A <see cref="NoContentResult"/> indicating success or a <see cref="ForbidResult"/> or a <see cref="NotFoundResult"/> on failure.</returns>
     [HttpPost("{userId}/EasyPassword")]
-    [Obsolete("Use Quick Connect instead")]
     [Authorize]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public ActionResult UpdateUserEasyPassword(
+    public async Task<ActionResult> UpdateUserEasyPassword(
         [FromRoute, Required] Guid userId,
         [FromBody, Required] UpdateUserEasyPassword request)
     {
-        return Forbid();
+        if (!RequestHelpers.AssertCanUpdateUser(_userManager, User, userId, true))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to update the easy password.");
+        }
+
+        var user = _userManager.GetUserById(userId);
+
+        if (user is null)
+        {
+            return NotFound("User not found");
+        }
+
+        if (request.ResetPassword)
+        {
+            await _userManager.ResetEasyPassword(user).ConfigureAwait(false);
+        }
+        else
+        {
+            await _userManager.ChangeEasyPassword(user, request.NewPw ?? string.Empty, request.NewPassword ?? string.Empty).ConfigureAwait(false);
+        }
+
+        return NoContent();
     }
 
     /// <summary>
@@ -475,7 +495,7 @@ public class UserController : BaseJellyfinApiController
             await _userManager.ChangePassword(newUser, request.Password).ConfigureAwait(false);
         }
 
-        var result = _userManager.GetUserDto(newUser, HttpContext.GetNormalizedRemoteIP().ToString());
+        var result = _userManager.GetUserDto(newUser, HttpContext.GetNormalizedRemoteIp().ToString());
 
         return result;
     }
@@ -490,11 +510,11 @@ public class UserController : BaseJellyfinApiController
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<ActionResult<ForgotPasswordResult>> ForgotPassword([FromBody, Required] ForgotPasswordDto forgotPasswordRequest)
     {
-        var ip = HttpContext.GetNormalizedRemoteIP();
+        var ip = HttpContext.GetNormalizedRemoteIp();
         var isLocal = HttpContext.IsLocal()
                       || _networkManager.IsInLocalNetwork(ip);
 
-        if (!isLocal)
+        if (isLocal)
         {
             _logger.LogWarning("Password reset process initiated from outside the local network with IP: {IP}", ip);
         }
@@ -571,7 +591,7 @@ public class UserController : BaseJellyfinApiController
 
         if (filterByNetwork)
         {
-            if (!_networkManager.IsInLocalNetwork(HttpContext.GetNormalizedRemoteIP()))
+            if (!_networkManager.IsInLocalNetwork(HttpContext.GetNormalizedRemoteIp()))
             {
                 users = users.Where(i => i.HasPermission(PermissionKind.EnableRemoteAccess));
             }
@@ -579,7 +599,7 @@ public class UserController : BaseJellyfinApiController
 
         var result = users
             .OrderBy(u => u.Username)
-            .Select(i => _userManager.GetUserDto(i, HttpContext.GetNormalizedRemoteIP().ToString()));
+            .Select(i => _userManager.GetUserDto(i, HttpContext.GetNormalizedRemoteIp().ToString()));
 
         return result;
     }

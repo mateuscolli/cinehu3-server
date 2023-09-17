@@ -55,18 +55,6 @@ namespace MediaBrowser.XbmcMetadata.Parsers
                         break;
                     }
 
-                case "seasonname":
-                    {
-                        var name = reader.ReadElementContentAsString();
-
-                        if (!string.IsNullOrWhiteSpace(name))
-                        {
-                            item.Name = name;
-                        }
-
-                        break;
-                    }
-
                 default:
                     base.FetchDataFromXmlNode(reader, itemResult);
                     break;

@@ -6,9 +6,9 @@ using Jellyfin.Data.Entities.Security;
 using Jellyfin.Server.Implementations;
 using MediaBrowser.Controller;
 using MediaBrowser.Controller.Library;
-using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using SQLitePCL.pretty;
 
 namespace Jellyfin.Server.Migrations.Routines
 {
@@ -56,7 +56,10 @@ namespace Jellyfin.Server.Migrations.Routines
         public void Perform()
         {
             var dataPath = _appPaths.DataPath;
-            using (var connection = new SqliteConnection($"Filename={Path.Combine(dataPath, DbFilename)}"))
+            using (var connection = SQLite3.Open(
+                Path.Combine(dataPath, DbFilename),
+                ConnectionFlags.ReadOnly,
+                null))
             {
                 using var dbContext = _dbProvider.CreateDbContext();
 
@@ -64,23 +67,23 @@ namespace Jellyfin.Server.Migrations.Routines
 
                 foreach (var row in authenticatedDevices)
                 {
-                    var dateCreatedStr = row.GetString(9);
+                    var dateCreatedStr = row[9].ToString();
                     _ = DateTime.TryParse(dateCreatedStr, out var dateCreated);
-                    var dateLastActivityStr = row.GetString(10);
+                    var dateLastActivityStr = row[10].ToString();
                     _ = DateTime.TryParse(dateLastActivityStr, out var dateLastActivity);
 
-                    if (row.IsDBNull(6))
+                    if (row[6].IsDbNull())
                     {
-                        dbContext.ApiKeys.Add(new ApiKey(row.GetString(3))
+                        dbContext.ApiKeys.Add(new ApiKey(row[3].ToString())
                         {
-                            AccessToken = row.GetString(1),
+                            AccessToken = row[1].ToString(),
                             DateCreated = dateCreated,
                             DateLastActivity = dateLastActivity
                         });
                     }
                     else
                     {
-                        var userId = row.GetGuid(6);
+                        var userId = new Guid(row[6].ToString());
                         var user = _userManager.GetUserById(userId);
                         if (user is null)
                         {
@@ -89,14 +92,14 @@ namespace Jellyfin.Server.Migrations.Routines
                         }
 
                         dbContext.Devices.Add(new Device(
-                            userId,
-                            row.GetString(3),
-                            row.GetString(4),
-                            row.GetString(5),
-                            row.GetString(2))
+                            new Guid(row[6].ToString()),
+                            row[3].ToString(),
+                            row[4].ToString(),
+                            row[5].ToString(),
+                            row[2].ToString())
                         {
-                            AccessToken = row.GetString(1),
-                            IsActive = row.GetBoolean(8),
+                            AccessToken = row[1].ToString(),
+                            IsActive = row[8].ToBool(),
                             DateCreated = dateCreated,
                             DateLastActivity = dateLastActivity
                         });
@@ -107,12 +110,12 @@ namespace Jellyfin.Server.Migrations.Routines
                 var deviceIds = new HashSet<string>();
                 foreach (var row in deviceOptions)
                 {
-                    if (row.IsDBNull(2))
+                    if (row[2].IsDbNull())
                     {
                         continue;
                     }
 
-                    var deviceId = row.GetString(2);
+                    var deviceId = row[2].ToString();
                     if (deviceIds.Contains(deviceId))
                     {
                         continue;
@@ -122,7 +125,7 @@ namespace Jellyfin.Server.Migrations.Routines
 
                     dbContext.DeviceOptions.Add(new DeviceOptions(deviceId)
                     {
-                        CustomName = row.IsDBNull(1) ? null : row.GetString(1)
+                        CustomName = row[1].IsDbNull() ? null : row[1].ToString()
                     });
                 }
 

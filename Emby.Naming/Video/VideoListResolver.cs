@@ -12,13 +12,9 @@ namespace Emby.Naming.Video
     /// <summary>
     /// Resolves alternative versions and extras from list of video files.
     /// </summary>
-    public static partial class VideoListResolver
+    public static class VideoListResolver
     {
-        [GeneratedRegex("[0-9]{2}[0-9]+[ip]", RegexOptions.IgnoreCase)]
-        private static partial Regex ResolutionRegex();
-
-        [GeneratedRegex(@"^\[([^]]*)\]")]
-        private static partial Regex CheckMultiVersionRegex();
+        private static readonly Regex _resolutionRegex = new Regex("[0-9]{2}[0-9]+[ip]", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         /// <summary>
         /// Resolves alternative versions and extras from list of video files.
@@ -135,7 +131,7 @@ namespace Emby.Naming.Video
 
             if (videos.Count > 1)
             {
-                var groups = videos.GroupBy(x => ResolutionRegex().IsMatch(x.Files[0].FileNameWithoutExtension)).ToList();
+                var groups = videos.GroupBy(x => _resolutionRegex.IsMatch(x.Files[0].FileNameWithoutExtension)).ToList();
                 videos.Clear();
                 foreach (var group in groups)
                 {
@@ -205,7 +201,7 @@ namespace Emby.Naming.Video
             // The CleanStringParser should have removed common keywords etc.
             return testFilename.IsEmpty
                    || testFilename[0] == '-'
-                   || CheckMultiVersionRegex().IsMatch(testFilename);
+                   || Regex.IsMatch(testFilename, @"^\[([^]]*)\]", RegexOptions.Compiled);
         }
     }
 }

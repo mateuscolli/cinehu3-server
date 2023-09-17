@@ -3,7 +3,6 @@
 #pragma warning disable CS1591
 
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -64,7 +63,7 @@ namespace Emby.Server.Implementations.Library
         private const string ShortcutFileExtension = ".mblink";
 
         private readonly ILogger<LibraryManager> _logger;
-        private readonly ConcurrentDictionary<Guid, BaseItem> _cache;
+        private readonly IMemoryCache _memoryCache;
         private readonly ITaskManager _taskManager;
         private readonly IUserManager _userManager;
         private readonly IUserDataManager _userDataRepository;
@@ -112,6 +111,7 @@ namespace Emby.Server.Implementations.Library
         /// <param name="mediaEncoder">The media encoder.</param>
         /// <param name="itemRepository">The item repository.</param>
         /// <param name="imageProcessor">The image processor.</param>
+        /// <param name="memoryCache">The memory cache.</param>
         /// <param name="namingOptions">The naming options.</param>
         /// <param name="directoryService">The directory service.</param>
         public LibraryManager(
@@ -128,6 +128,7 @@ namespace Emby.Server.Implementations.Library
             IMediaEncoder mediaEncoder,
             IItemRepository itemRepository,
             IImageProcessor imageProcessor,
+            IMemoryCache memoryCache,
             NamingOptions namingOptions,
             IDirectoryService directoryService)
         {
@@ -144,7 +145,7 @@ namespace Emby.Server.Implementations.Library
             _mediaEncoder = mediaEncoder;
             _itemRepository = itemRepository;
             _imageProcessor = imageProcessor;
-            _cache = new ConcurrentDictionary<Guid, BaseItem>();
+            _memoryCache = memoryCache;
             _namingOptions = namingOptions;
 
             _extraResolver = new ExtraResolver(loggerFactory.CreateLogger<ExtraResolver>(), namingOptions, directoryService);
@@ -299,7 +300,7 @@ namespace Emby.Server.Implementations.Library
                 }
             }
 
-            _cache[item.Id] = item;
+            _memoryCache.Set(item.Id, item);
         }
 
         public void DeleteItem(BaseItem item, DeleteOptions options)
@@ -358,7 +359,7 @@ namespace Emby.Server.Implementations.Library
 
             var children = item.IsFolder
                 ? ((Folder)item).GetRecursiveChildren(false)
-                : Array.Empty<BaseItem>();
+                : Enumerable.Empty<BaseItem>();
 
             foreach (var metadataPath in GetMetadataPaths(item, children))
             {
@@ -440,7 +441,7 @@ namespace Emby.Server.Implementations.Library
                 _itemRepository.DeleteItem(child.Id);
             }
 
-            _cache.TryRemove(item.Id, out _);
+            _memoryCache.Remove(item.Id);
 
             ReportItemRemoved(item, parent);
         }
@@ -1232,7 +1233,7 @@ namespace Emby.Server.Implementations.Library
                 throw new ArgumentException("Guid can't be empty", nameof(id));
             }
 
-            if (_cache.TryGetValue(id, out BaseItem item))
+            if (_memoryCache.TryGetValue(id, out BaseItem item))
             {
                 return item;
             }
@@ -1263,14 +1264,7 @@ namespace Emby.Server.Implementations.Library
                 AddUserToQuery(query, query.User, allowExternalContent);
             }
 
-            var itemList = _itemRepository.GetItemList(query);
-            var user = query.User;
-            if (user is not null)
-            {
-                return itemList.Where(i => i.IsVisible(user)).ToList();
-            }
-
-            return itemList;
+            return _itemRepository.GetItemList(query);
         }
 
         public List<BaseItem> GetItemList(InternalItemsQuery query)
@@ -2068,9 +2062,7 @@ namespace Emby.Server.Implementations.Library
                     .Find(folder => folder is CollectionFolder) as CollectionFolder;
             }
 
-            return collectionFolder is null
-                ? new LibraryOptions()
-                : collectionFolder.GetLibraryOptions();
+            return collectionFolder is null ? new LibraryOptions() : collectionFolder.GetLibraryOptions();
         }
 
         public string GetContentType(BaseItem item)

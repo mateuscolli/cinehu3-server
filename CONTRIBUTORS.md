@@ -126,7 +126,6 @@
  - [SuperSandro2000](https://github.com/SuperSandro2000)
  - [tbraeutigam](https://github.com/tbraeutigam)
  - [teacupx](https://github.com/teacupx)
- - [TelepathicWalrus](https://github.com/TelepathicWalrus)
  - [Terror-Gene](https://github.com/Terror-Gene)
  - [ThatNerdyPikachu](https://github.com/ThatNerdyPikachu)
  - [ThibaultNocchi](https://github.com/ThibaultNocchi)
@@ -165,9 +164,6 @@
  - [MinecraftPlaye](https://github.com/MinecraftPlaye)
  - [RealGreenDragon](https://github.com/RealGreenDragon)
  - [ipitio](https://github.com/ipitio)
- - [TheTyrius](https://github.com/TheTyrius)
- - [tallbl0nde](https://github.com/tallbl0nde)
- - [sleepycatcoding](https://github.com/sleepycatcoding)
 
 # Emby Contributors
 

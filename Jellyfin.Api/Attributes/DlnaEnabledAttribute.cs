@@ -1,4 +1,4 @@
-﻿using Emby.Dlna;
+using Emby.Dlna;
 using MediaBrowser.Controller.Configuration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;

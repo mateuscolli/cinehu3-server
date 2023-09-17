@@ -1,4 +1,5 @@
 #nullable disable
+#pragma warning disable CS1591
 
 using System;
 using System.Collections.Generic;
@@ -19,9 +20,6 @@ using Microsoft.Extensions.Logging;
 
 namespace MediaBrowser.MediaEncoding.Probing
 {
-    /// <summary>
-    /// Class responsible for normalizing FFprobe output.
-    /// </summary>
     public class ProbeResultNormalizer
     {
         // When extracting subtitles, the maximum length to consider (to avoid invalid filenames)
@@ -38,11 +36,6 @@ namespace MediaBrowser.MediaEncoding.Probing
 
         private string[] _splitWhiteList;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="ProbeResultNormalizer"/> class.
-        /// </summary>
-        /// <param name="logger">The <see cref="ILogger{ProbeResultNormalizer}"/> for use with the <see cref="ProbeResultNormalizer"/> instance.</param>
-        /// <param name="localization">The <see cref="ILocalizationManager"/> for use with the <see cref="ProbeResultNormalizer"/> instance.</param>
         public ProbeResultNormalizer(ILogger logger, ILocalizationManager localization)
         {
             _logger = logger;
@@ -80,15 +73,6 @@ namespace MediaBrowser.MediaEncoding.Probing
             "Smith/Kotzen",
         };
 
-        /// <summary>
-        /// Transforms a FFprobe response into its <see cref="MediaInfo"/> equivalent.
-        /// </summary>
-        /// <param name="data">The <see cref="InternalMediaInfoResult"/>.</param>
-        /// <param name="videoType">The <see cref="VideoType"/>.</param>
-        /// <param name="isAudio">A boolean indicating whether the media is audio.</param>
-        /// <param name="path">Path to media file.</param>
-        /// <param name="protocol">Path media protocol.</param>
-        /// <returns>The <see cref="MediaInfo"/>.</returns>
         public MediaInfo GetMediaInfo(InternalMediaInfoResult data, VideoType? videoType, bool isAudio, string path, MediaProtocol protocol)
         {
             var info = new MediaInfo
@@ -268,30 +252,25 @@ namespace MediaBrowser.MediaEncoding.Probing
                 return null;
             }
 
-            // Input can be a list of multiple, comma-delimited formats - each of them needs to be checked
-            var splitFormat = format.Split(',');
-            for (var i = 0; i < splitFormat.Length; i++)
+            // Handle MPEG-1 container
+            if (string.Equals(format, "mpegvideo", StringComparison.OrdinalIgnoreCase))
             {
-                // Handle MPEG-1 container
-                if (string.Equals(splitFormat[i], "mpegvideo", StringComparison.OrdinalIgnoreCase))
-                {
-                    splitFormat[i] = "mpeg";
-                }
-
-                // Handle MPEG-2 container
-                else if (string.Equals(splitFormat[i], "mpeg", StringComparison.OrdinalIgnoreCase))
-                {
-                    splitFormat[i] = "ts";
-                }
-
-                // Handle matroska container
-                else if (string.Equals(splitFormat[i], "matroska", StringComparison.OrdinalIgnoreCase))
-                {
-                    splitFormat[i] = "mkv";
-                }
+                return "mpeg";
             }
 
-            return string.Join(',', splitFormat);
+            // Handle MPEG-2 container
+            if (string.Equals(format, "mpeg", StringComparison.OrdinalIgnoreCase))
+            {
+                return "ts";
+            }
+
+            // Handle matroska container
+            if (string.Equals(format, "matroska", StringComparison.OrdinalIgnoreCase))
+            {
+                return "mkv";
+            }
+
+            return format;
         }
 
         private int? GetEstimatedAudioBitrate(string codec, int? channels)
@@ -762,11 +741,9 @@ namespace MediaBrowser.MediaEncoding.Probing
                     && !string.Equals(streamInfo.FieldOrder, "progressive", StringComparison.OrdinalIgnoreCase);
 
                 if (isAudio
-                    && (string.Equals(stream.Codec, "bmp", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(stream.Codec, "gif", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(stream.Codec, "mjpeg", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(stream.Codec, "png", StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(stream.Codec, "webp", StringComparison.OrdinalIgnoreCase)))
+                    || string.Equals(stream.Codec, "mjpeg", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(stream.Codec, "gif", StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(stream.Codec, "png", StringComparison.OrdinalIgnoreCase))
                 {
                     stream.Type = MediaStreamType.EmbeddedImage;
                 }

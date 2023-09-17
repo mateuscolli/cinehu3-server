@@ -38,7 +38,7 @@ public class LanFilteringMiddleware
             return;
         }
 
-        var host = httpContext.GetNormalizedRemoteIP();
+        var host = httpContext.GetNormalizedRemoteIp();
         if (!networkManager.IsInLocalNetwork(host))
         {
             return;

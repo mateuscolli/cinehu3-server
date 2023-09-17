@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.ComponentModel;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -59,7 +59,7 @@ namespace Jellyfin.Extensions.Json.Converters
                 var typedValueIndex = 0;
                 for (var i = 0; i < stringEntries.Length; i++)
                 {
-                    if (parsedValues[i] is not null)
+                    if (parsedValues[i] != null)
                     {
                         typedValues.SetValue(parsedValues[i], typedValueIndex);
                         typedValueIndex++;

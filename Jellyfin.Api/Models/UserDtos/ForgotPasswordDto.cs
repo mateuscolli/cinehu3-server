@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Jellyfin.Api.Models.UserDtos;
 
@@ -11,5 +11,5 @@ public class ForgotPasswordDto
     /// Gets or sets the entered username to have its password reset.
     /// </summary>
     [Required]
-    public required string EnteredUsername { get; set; }
+    required public string EnteredUsername { get; set; }
 }

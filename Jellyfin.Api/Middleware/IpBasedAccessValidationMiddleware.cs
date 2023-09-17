@@ -9,15 +9,15 @@ namespace Jellyfin.Api.Middleware;
 /// <summary>
 /// Validates the IP of requests coming from local networks wrt. remote access.
 /// </summary>
-public class IPBasedAccessValidationMiddleware
+public class IpBasedAccessValidationMiddleware
 {
     private readonly RequestDelegate _next;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="IPBasedAccessValidationMiddleware"/> class.
+    /// Initializes a new instance of the <see cref="IpBasedAccessValidationMiddleware"/> class.
     /// </summary>
     /// <param name="next">The next delegate in the pipeline.</param>
-    public IPBasedAccessValidationMiddleware(RequestDelegate next)
+    public IpBasedAccessValidationMiddleware(RequestDelegate next)
     {
         _next = next;
     }
@@ -37,9 +37,9 @@ public class IPBasedAccessValidationMiddleware
             return;
         }
 
-        var remoteIP = httpContext.Connection.RemoteIpAddress ?? IPAddress.Loopback;
+        var remoteIp = httpContext.Connection.RemoteIpAddress ?? IPAddress.Loopback;
 
-        if (!networkManager.HasRemoteAccess(remoteIP))
+        if (!networkManager.HasRemoteAccess(remoteIp))
         {
             return;
         }

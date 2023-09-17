@@ -462,10 +462,10 @@ namespace Emby.Server.Implementations.LiveTv.Listings
             }
 
             StringBuilder str = new StringBuilder("[", 1 + (programIds.Count * 13));
-            foreach (var i in programIds)
+            foreach (ReadOnlySpan<char> i in programIds)
             {
                 str.Append('"')
-                    .Append(i[..10])
+                    .Append(i.Slice(0, 10))
                     .Append("\",");
             }
 

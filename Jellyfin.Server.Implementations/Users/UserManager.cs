@@ -1,4 +1,4 @@
-﻿#pragma warning disable CA1307
+#pragma warning disable CA1307
 
 using System;
 using System.Collections.Concurrent;
@@ -31,7 +31,7 @@ namespace Jellyfin.Server.Implementations.Users
     /// <summary>
     /// Manages the creation and retrieval of <see cref="User"/> instances.
     /// </summary>
-    public partial class UserManager : IUserManager
+    public class UserManager : IUserManager
     {
         private readonly IDbContextFactory<JellyfinDbContext> _dbProvider;
         private readonly IEventManager _eventManager;
@@ -104,12 +104,6 @@ namespace Jellyfin.Server.Implementations.Users
 
         /// <inheritdoc/>
         public IEnumerable<Guid> UsersIds => _users.Keys;
-
-        // This is some regex that matches only on unicode "word" characters, as well as -, _ and @
-        // In theory this will cut out most if not all 'control' characters which should help minimize any weirdness
-        // Usernames can contain letters (a-z + whatever else unicode is cool with), numbers (0-9), at-signs (@), dashes (-), underscores (_), apostrophes ('), periods (.) and spaces ( )
-        [GeneratedRegex("^[\\w\\ \\-'._@]+$")]
-        private static partial Regex ValidUsernameRegex();
 
         /// <inheritdoc/>
         public User? GetUserById(Guid id)
@@ -275,15 +269,36 @@ namespace Jellyfin.Server.Implementations.Users
         }
 
         /// <inheritdoc/>
+        public Task ResetEasyPassword(User user)
+        {
+            return ChangeEasyPassword(user, string.Empty, null);
+        }
+
+        /// <inheritdoc/>
         public async Task ChangePassword(User user, string newPassword)
         {
             ArgumentNullException.ThrowIfNull(user);
-            if (user.HasPermission(PermissionKind.IsAdministrator) && string.IsNullOrWhiteSpace(newPassword))
-            {
-                throw new ArgumentException("Admin user passwords must not be empty", nameof(newPassword));
-            }
 
             await GetAuthenticationProvider(user).ChangePassword(user, newPassword).ConfigureAwait(false);
+            await UpdateUserAsync(user).ConfigureAwait(false);
+
+            await _eventManager.PublishAsync(new UserPasswordChangedEventArgs(user)).ConfigureAwait(false);
+        }
+
+        /// <inheritdoc/>
+        public async Task ChangeEasyPassword(User user, string newPassword, string? newPasswordSha1)
+        {
+            if (newPassword is not null)
+            {
+                newPasswordSha1 = _cryptoProvider.CreatePasswordHash(newPassword).ToString();
+            }
+
+            if (string.IsNullOrWhiteSpace(newPasswordSha1))
+            {
+                throw new ArgumentNullException(nameof(newPasswordSha1));
+            }
+
+            user.EasyPassword = newPasswordSha1;
             await UpdateUserAsync(user).ConfigureAwait(false);
 
             await _eventManager.PublishAsync(new UserPasswordChangedEventArgs(user)).ConfigureAwait(false);
@@ -300,6 +315,7 @@ namespace Jellyfin.Server.Implementations.Users
                 ServerId = _appHost.SystemId,
                 HasPassword = hasPassword,
                 HasConfiguredPassword = hasPassword,
+                HasConfiguredEasyPassword = !string.IsNullOrEmpty(user.EasyPassword),
                 EnableAutoLogin = user.EnableAutoLogin,
                 LastLoginDate = user.LastLoginDate,
                 LastActivityDate = user.LastActivityDate,
@@ -533,7 +549,7 @@ namespace Jellyfin.Server.Implementations.Users
             }
 
             var defaultName = Environment.UserName;
-            if (string.IsNullOrWhiteSpace(defaultName) || !ValidUsernameRegex().IsMatch(defaultName))
+            if (string.IsNullOrWhiteSpace(defaultName) || !IsValidUsername(defaultName))
             {
                 defaultName = "MyJellyfinUser";
             }
@@ -716,12 +732,20 @@ namespace Jellyfin.Server.Implementations.Users
 
         internal static void ThrowIfInvalidUsername(string name)
         {
-            if (!string.IsNullOrWhiteSpace(name) && ValidUsernameRegex().IsMatch(name))
+            if (!string.IsNullOrWhiteSpace(name) && IsValidUsername(name))
             {
                 return;
             }
 
             throw new ArgumentException("Usernames can contain unicode symbols, numbers (0-9), dashes (-), underscores (_), apostrophes ('), and periods (.)", nameof(name));
+        }
+
+        private static bool IsValidUsername(ReadOnlySpan<char> name)
+        {
+            // This is some regex that matches only on unicode "word" characters, as well as -, _ and @
+            // In theory this will cut out most if not all 'control' characters which should help minimize any weirdness
+            // Usernames can contain letters (a-z + whatever else unicode is cool with), numbers (0-9), at-signs (@), dashes (-), underscores (_), apostrophes ('), periods (.) and spaces ( )
+            return Regex.IsMatch(name, @"^[\w\ \-'._@]+$");
         }
 
         private IAuthenticationProvider GetAuthenticationProvider(User user)
@@ -808,6 +832,16 @@ namespace Jellyfin.Server.Implementations.Users
                 }
             }
 
+            if (!success
+                && _networkManager.IsInLocalNetwork(remoteEndPoint)
+                && user?.EnableLocalPassword == true
+                && !string.IsNullOrEmpty(user.EasyPassword))
+            {
+                // Check easy password
+                var passwordHash = PasswordHash.Parse(user.EasyPassword);
+                success = _cryptoProvider.Verify(passwordHash, password);
+            }
+
             return (authenticationProvider, username, success);
         }
 
@@ -833,7 +867,7 @@ namespace Jellyfin.Server.Implementations.Users
             }
             catch (AuthenticationException ex)
             {
-                _logger.LogDebug(ex, "Error authenticating with provider {Provider}", provider.Name);
+                _logger.LogError(ex, "Error authenticating with provider {Provider}", provider.Name);
 
                 return (username, false);
             }

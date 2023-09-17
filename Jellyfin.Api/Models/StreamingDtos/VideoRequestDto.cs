@@ -1,4 +1,4 @@
-﻿namespace Jellyfin.Api.Models.StreamingDtos;
+namespace Jellyfin.Api.Models.StreamingDtos;
 
 /// <summary>
 /// The video request dto.

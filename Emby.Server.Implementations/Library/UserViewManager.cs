@@ -46,9 +46,10 @@ namespace Emby.Server.Implementations.Library
         public Folder[] GetUserViews(UserViewQuery query)
         {
             var user = _userManager.GetUserById(query.UserId);
+
             if (user is null)
             {
-                throw new ArgumentException("User id specified in the query does not exist.", nameof(query));
+                throw new ArgumentException("User Id specified in the query does not exist.", nameof(query));
             }
 
             var folders = _libraryManager.GetUserRootFolder()
@@ -57,26 +58,13 @@ namespace Emby.Server.Implementations.Library
                 .ToList();
 
             var groupedFolders = new List<ICollectionFolder>();
+
             var list = new List<Folder>();
 
             foreach (var folder in folders)
             {
                 var collectionFolder = folder as ICollectionFolder;
                 var folderViewType = collectionFolder?.CollectionType;
-
-                // Playlist library requires special handling because the folder only refrences user playlists
-                if (string.Equals(folderViewType, CollectionType.Playlists, StringComparison.OrdinalIgnoreCase))
-                {
-                    var items = folder.GetItemList(new InternalItemsQuery(user)
-                    {
-                        ParentId = folder.ParentId
-                    });
-
-                    if (!items.Any(item => item.IsVisible(user)))
-                    {
-                        continue;
-                    }
-                }
 
                 if (UserView.IsUserSpecific(folder))
                 {
@@ -144,12 +132,14 @@ namespace Emby.Server.Implementations.Library
             }
 
             var sorted = _libraryManager.Sort(list, user, new[] { ItemSortBy.SortName }, SortOrder.Ascending).ToList();
+
             var orders = user.GetPreferenceValues<Guid>(PreferenceKind.OrderedViews);
 
             return list
                 .OrderBy(i =>
                 {
                     var index = Array.IndexOf(orders, i.Id);
+
                     if (index == -1
                         && i is UserView view
                         && !view.DisplayParentId.Equals(default))

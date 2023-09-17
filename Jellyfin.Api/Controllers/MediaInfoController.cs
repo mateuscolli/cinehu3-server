@@ -184,7 +184,7 @@ public class MediaInfoController : BaseJellyfinApiController
                     enableTranscoding.Value,
                     allowVideoStreamCopy.Value,
                     allowAudioStreamCopy.Value,
-                    Request.HttpContext.GetNormalizedRemoteIP());
+                    Request.HttpContext.GetNormalizedRemoteIp());
             }
 
             _mediaInfoHelper.SortMediaSources(info, maxStreamingBitrate);

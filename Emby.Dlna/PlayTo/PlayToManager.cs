@@ -1,3 +1,5 @@
+#nullable disable
+
 #pragma warning disable CS1591
 
 using System;
@@ -65,7 +67,7 @@ namespace Emby.Dlna.PlayTo
             _deviceDiscovery.DeviceDiscovered += OnDeviceDiscoveryDeviceDiscovered;
         }
 
-        private async void OnDeviceDiscoveryDeviceDiscovered(object? sender, GenericEventArgs<UpnpDeviceInfo> e)
+        private async void OnDeviceDiscoveryDeviceDiscovered(object sender, GenericEventArgs<UpnpDeviceInfo> e)
         {
             if (_disposed)
             {
@@ -74,12 +76,12 @@ namespace Emby.Dlna.PlayTo
 
             var info = e.Argument;
 
-            if (!info.Headers.TryGetValue("USN", out string? usn))
+            if (!info.Headers.TryGetValue("USN", out string usn))
             {
                 usn = string.Empty;
             }
 
-            if (!info.Headers.TryGetValue("NT", out string? nt))
+            if (!info.Headers.TryGetValue("NT", out string nt))
             {
                 nt = string.Empty;
             }
@@ -159,7 +161,7 @@ namespace Emby.Dlna.PlayTo
             var uri = info.Location;
             _logger.LogDebug("Attempting to create PlayToController from location {0}", uri);
 
-            if (info.Headers.TryGetValue("USN", out string? uuid))
+            if (info.Headers.TryGetValue("USN", out string uuid))
             {
                 uuid = GetUuid(uuid);
             }
@@ -187,7 +189,7 @@ namespace Emby.Dlna.PlayTo
 
                 _sessionManager.UpdateDeviceName(sessionInfo.Id, deviceName);
 
-                string serverAddress = _appHost.GetSmartApiUrl(info.RemoteIPAddress);
+                string serverAddress = _appHost.GetSmartApiUrl(info.RemoteIpAddress);
 
                 controller = new PlayToController(
                     sessionInfo,

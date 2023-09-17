@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+using System.Diagnostics;
 using System.Globalization;
 using System.Threading.Tasks;
 using MediaBrowser.Common.Extensions;
@@ -51,9 +51,9 @@ public class ResponseTimeMiddleware
             if (enableWarning && responseTimeMs > warningThreshold && _logger.IsEnabled(LogLevel.Debug))
             {
                 _logger.LogDebug(
-                    "Slow HTTP Response from {Url} to {RemoteIP} in {Elapsed:g} with Status Code {StatusCode}",
+                    "Slow HTTP Response from {Url} to {RemoteIp} in {Elapsed:g} with Status Code {StatusCode}",
                     context.Request.GetDisplayUrl(),
-                    context.GetNormalizedRemoteIP(),
+                    context.GetNormalizedRemoteIp(),
                     responseTime,
                     context.Response.StatusCode);
             }

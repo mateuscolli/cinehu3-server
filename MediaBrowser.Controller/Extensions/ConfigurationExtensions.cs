@@ -60,11 +60,6 @@ namespace MediaBrowser.Controller.Extensions
         public const string UnixSocketPermissionsKey = "kestrel:socketPermissions";
 
         /// <summary>
-        /// The cache size of the SQL database, see cache_size.
-        /// </summary>
-        public const string SqliteCacheSizeKey = "sqlite:cacheSize";
-
-        /// <summary>
         /// Gets a value indicating whether the application should host static web content from the <see cref="IConfiguration"/>.
         /// </summary>
         /// <param name="configuration">The configuration to retrieve the value from.</param>
@@ -120,13 +115,5 @@ namespace MediaBrowser.Controller.Extensions
         /// <returns>The unix socket permissions.</returns>
         public static string? GetUnixSocketPermissions(this IConfiguration configuration)
             => configuration[UnixSocketPermissionsKey];
-
-        /// <summary>
-        /// Gets the cache_size from the <see cref="IConfiguration" />.
-        /// </summary>
-        /// <param name="configuration">The configuration to read the setting from.</param>
-        /// <returns>The sqlite cache size.</returns>
-        public static int? GetSqliteCacheSize(this IConfiguration configuration)
-            => configuration.GetValue<int?>(SqliteCacheSizeKey);
     }
 }

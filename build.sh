@@ -101,7 +101,7 @@ if [[ -z ${BUILD_TYPE} || -z ${PLATFORM} ]]; then
 fi
 
 export SOURCE_DIR="$( pwd )"
-export ARTIFACT_DIR="${SOURCE_DIR}/../bin/${PLATFORM}"
+export ARTIFACT_DIR="${SOURCE_DIR}/bin/${PLATFORM}"
 
 # Determine build type
 case ${BUILD_TYPE} in

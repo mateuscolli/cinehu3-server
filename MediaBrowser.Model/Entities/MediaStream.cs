@@ -6,7 +6,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
-using Jellyfin.Data.Enums;
 using Jellyfin.Extensions;
 using MediaBrowser.Model.Dlna;
 using MediaBrowser.Model.Extensions;
@@ -149,7 +148,7 @@ namespace MediaBrowser.Model.Entities
         /// Gets the video range.
         /// </summary>
         /// <value>The video range.</value>
-        public VideoRange VideoRange
+        public string VideoRange
         {
             get
             {
@@ -163,7 +162,7 @@ namespace MediaBrowser.Model.Entities
         /// Gets the video range type.
         /// </summary>
         /// <value>The video range type.</value>
-        public VideoRangeType VideoRangeType
+        public string VideoRangeType
         {
             get
             {
@@ -307,9 +306,9 @@ namespace MediaBrowser.Model.Entities
                             attributes.Add(Codec.ToUpperInvariant());
                         }
 
-                        if (VideoRange != VideoRange.Unknown)
+                        if (!string.IsNullOrEmpty(VideoRange))
                         {
-                            attributes.Add(VideoRange.ToString());
+                            attributes.Add(VideoRange.ToUpperInvariant());
                         }
 
                         if (!string.IsNullOrEmpty(Title))
@@ -678,23 +677,23 @@ namespace MediaBrowser.Model.Entities
             return true;
         }
 
-        public (VideoRange VideoRange, VideoRangeType VideoRangeType) GetVideoColorRange()
+        public (string VideoRange, string VideoRangeType) GetVideoColorRange()
         {
             if (Type != MediaStreamType.Video)
             {
-                return (VideoRange.Unknown, VideoRangeType.Unknown);
+                return (null, null);
             }
 
             var colorTransfer = ColorTransfer;
 
             if (string.Equals(colorTransfer, "smpte2084", StringComparison.OrdinalIgnoreCase))
             {
-                return (VideoRange.HDR, VideoRangeType.HDR10);
+                return ("HDR", "HDR10");
             }
 
             if (string.Equals(colorTransfer, "arib-std-b67", StringComparison.OrdinalIgnoreCase))
             {
-                return (VideoRange.HDR, VideoRangeType.HLG);
+                return ("HDR", "HLG");
             }
 
             var codecTag = CodecTag;
@@ -712,10 +711,10 @@ namespace MediaBrowser.Model.Entities
                 || string.Equals(codecTag, "dvhe", StringComparison.OrdinalIgnoreCase)
                 || string.Equals(codecTag, "dav1", StringComparison.OrdinalIgnoreCase))
             {
-                return (VideoRange.HDR, VideoRangeType.DOVI);
+                return ("HDR", "DOVI");
             }
 
-            return (VideoRange.SDR, VideoRangeType.SDR);
+            return ("SDR", "SDR");
         }
     }
 }

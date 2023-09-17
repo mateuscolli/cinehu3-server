@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Globalization;
 using System.Threading.Tasks;
 using Jellyfin.Data.Entities;
@@ -58,18 +58,15 @@ namespace Jellyfin.Server.Implementations.Events.Consumers.Session
             var user = eventArgs.Users[0];
 
             await _activityManager.CreateAsync(new ActivityLog(
-                string.Format(
-                    CultureInfo.InvariantCulture,
-                    _localizationManager.GetLocalizedString("UserStartedPlayingItemWithValues"),
-                    user.Username,
-                    GetItemName(eventArgs.MediaInfo),
-                    eventArgs.DeviceName),
-                GetPlaybackNotificationType(eventArgs.MediaInfo.MediaType),
-                user.Id)
-            {
-                ItemId = eventArgs.Item?.Id.ToString("N", CultureInfo.InvariantCulture),
-            })
-            .ConfigureAwait(false);
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        _localizationManager.GetLocalizedString("UserStartedPlayingItemWithValues"),
+                        user.Username,
+                        GetItemName(eventArgs.MediaInfo),
+                        eventArgs.DeviceName),
+                    GetPlaybackNotificationType(eventArgs.MediaInfo.MediaType),
+                    user.Id))
+                .ConfigureAwait(false);
         }
 
         private static string GetItemName(BaseItemDto item)

@@ -1,3 +1,5 @@
+#nullable disable
+
 #pragma warning disable CS1591
 
 using System;
@@ -23,7 +25,7 @@ namespace Emby.Dlna.PlayTo
         private readonly ILogger _logger;
 
         private readonly object _timerLock = new object();
-        private Timer? _timer;
+        private Timer _timer;
         private int _muteVol;
         private int _volume;
         private DateTime _lastVolumeRefresh;
@@ -38,13 +40,13 @@ namespace Emby.Dlna.PlayTo
             _logger = logger;
         }
 
-        public event EventHandler<PlaybackStartEventArgs>? PlaybackStart;
+        public event EventHandler<PlaybackStartEventArgs> PlaybackStart;
 
-        public event EventHandler<PlaybackProgressEventArgs>? PlaybackProgress;
+        public event EventHandler<PlaybackProgressEventArgs> PlaybackProgress;
 
-        public event EventHandler<PlaybackStoppedEventArgs>? PlaybackStopped;
+        public event EventHandler<PlaybackStoppedEventArgs> PlaybackStopped;
 
-        public event EventHandler<MediaChangedEventArgs>? MediaChanged;
+        public event EventHandler<MediaChangedEventArgs> MediaChanged;
 
         public DeviceInfo Properties { get; set; }
 
@@ -73,13 +75,13 @@ namespace Emby.Dlna.PlayTo
 
         public bool IsStopped => TransportState == TransportState.STOPPED;
 
-        public Action? OnDeviceUnavailable { get; set; }
+        public Action OnDeviceUnavailable { get; set; }
 
-        private TransportCommands? AvCommands { get; set; }
+        private TransportCommands AvCommands { get; set; }
 
-        private TransportCommands? RendererCommands { get; set; }
+        private TransportCommands RendererCommands { get; set; }
 
-        public UBaseObject? CurrentMediaInfo { get; private set; }
+        public UBaseObject CurrentMediaInfo { get; private set; }
 
         public void Start()
         {
@@ -129,7 +131,7 @@ namespace Emby.Dlna.PlayTo
                 _volumeRefreshActive = true;
 
                 var time = immediate ? 100 : 10000;
-                _timer?.Change(time, Timeout.Infinite);
+                _timer.Change(time, Timeout.Infinite);
             }
         }
 
@@ -147,7 +149,7 @@ namespace Emby.Dlna.PlayTo
 
                 _volumeRefreshActive = false;
 
-                _timer?.Change(Timeout.Infinite, Timeout.Infinite);
+                _timer.Change(Timeout.Infinite, Timeout.Infinite);
             }
         }
 
@@ -197,7 +199,7 @@ namespace Emby.Dlna.PlayTo
             }
         }
 
-        private DeviceService? GetServiceRenderingControl()
+        private DeviceService GetServiceRenderingControl()
         {
             var services = Properties.Services;
 
@@ -205,7 +207,7 @@ namespace Emby.Dlna.PlayTo
                 services.FirstOrDefault(s => (s.ServiceType ?? string.Empty).StartsWith("urn:schemas-upnp-org:service:RenderingControl", StringComparison.OrdinalIgnoreCase));
         }
 
-        private DeviceService? GetAvTransportService()
+        private DeviceService GetAvTransportService()
         {
             var services = Properties.Services;
 
@@ -238,7 +240,7 @@ namespace Emby.Dlna.PlayTo
                     Properties.BaseUrl,
                     service,
                     command.Name,
-                    rendererCommands!.BuildPost(command, service.ServiceType, value), // null checked above
+                    rendererCommands.BuildPost(command, service.ServiceType, value),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -263,7 +265,12 @@ namespace Emby.Dlna.PlayTo
                 return;
             }
 
-            var service = GetServiceRenderingControl() ?? throw new InvalidOperationException("Unable to find service");
+            var service = GetServiceRenderingControl();
+
+            if (service is null)
+            {
+                throw new InvalidOperationException("Unable to find service");
+            }
 
             // Set it early and assume it will succeed
             // Remote control will perform better
@@ -274,7 +281,7 @@ namespace Emby.Dlna.PlayTo
                     Properties.BaseUrl,
                     service,
                     command.Name,
-                    rendererCommands!.BuildPost(command, service.ServiceType, value), // null checked above
+                    rendererCommands.BuildPost(command, service.ServiceType, value),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -289,20 +296,26 @@ namespace Emby.Dlna.PlayTo
                 return;
             }
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
+            var service = GetAvTransportService();
+
+            if (service is null)
+            {
+                throw new InvalidOperationException("Unable to find service");
+            }
+
             await new DlnaHttpClient(_logger, _httpClientFactory)
                 .SendCommandAsync(
                     Properties.BaseUrl,
                     service,
                     command.Name,
-                    avCommands!.BuildPost(command, service.ServiceType, string.Format(CultureInfo.InvariantCulture, "{0:hh}:{0:mm}:{0:ss}", value), "REL_TIME"), // null checked above
+                    avCommands.BuildPost(command, service.ServiceType, string.Format(CultureInfo.InvariantCulture, "{0:hh}:{0:mm}:{0:ss}", value), "REL_TIME"),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
             RestartTimer(true);
         }
 
-        public async Task SetAvTransport(string url, string? header, string metaData, CancellationToken cancellationToken)
+        public async Task SetAvTransport(string url, string header, string metaData, CancellationToken cancellationToken)
         {
             var avCommands = await GetAVProtocolAsync(cancellationToken).ConfigureAwait(false);
 
@@ -322,8 +335,14 @@ namespace Emby.Dlna.PlayTo
                 { "CurrentURIMetaData", CreateDidlMeta(metaData) }
             };
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
-            var post = avCommands!.BuildPost(command, service.ServiceType, url, dictionary); // null checked above
+            var service = GetAvTransportService();
+
+            if (service is null)
+            {
+                throw new InvalidOperationException("Unable to find service");
+            }
+
+            var post = avCommands.BuildPost(command, service.ServiceType, url, dictionary);
             await new DlnaHttpClient(_logger, _httpClientFactory)
                 .SendCommandAsync(
                     Properties.BaseUrl,
@@ -353,7 +372,7 @@ namespace Emby.Dlna.PlayTo
          * SetNextAvTransport is used to specify to the DLNA device what is the next track to play.
          * Without that information, the next track command on the device does not work.
          */
-        public async Task SetNextAvTransport(string url, string? header, string metaData, CancellationToken cancellationToken = default)
+        public async Task SetNextAvTransport(string url, string header, string metaData, CancellationToken cancellationToken = default)
         {
             var avCommands = await GetAVProtocolAsync(cancellationToken).ConfigureAwait(false);
 
@@ -361,7 +380,7 @@ namespace Emby.Dlna.PlayTo
 
             _logger.LogDebug("{PropertyName} - SetNextAvTransport Uri: {Url} DlnaHeaders: {Header}", Properties.Name, url, header);
 
-            var command = avCommands?.ServiceActions.FirstOrDefault(c => string.Equals(c.Name, "SetNextAVTransportURI", StringComparison.OrdinalIgnoreCase));
+            var command = avCommands.ServiceActions.FirstOrDefault(c => string.Equals(c.Name, "SetNextAVTransportURI", StringComparison.OrdinalIgnoreCase));
             if (command is null)
             {
                 return;
@@ -373,8 +392,14 @@ namespace Emby.Dlna.PlayTo
                 { "NextURIMetaData", CreateDidlMeta(metaData) }
             };
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
-            var post = avCommands!.BuildPost(command, service.ServiceType, url, dictionary); // null checked above
+            var service = GetAvTransportService();
+
+            if (service is null)
+            {
+                throw new InvalidOperationException("Unable to find service");
+            }
+
+            var post = avCommands.BuildPost(command, service.ServiceType, url, dictionary);
             await new DlnaHttpClient(_logger, _httpClientFactory)
                 .SendCommandAsync(Properties.BaseUrl, service, command.Name, post, header, cancellationToken)
                 .ConfigureAwait(false);
@@ -398,7 +423,12 @@ namespace Emby.Dlna.PlayTo
                 return Task.CompletedTask;
             }
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
+            var service = GetAvTransportService();
+            if (service is null)
+            {
+                throw new InvalidOperationException("Unable to find service");
+            }
+
             return new DlnaHttpClient(_logger, _httpClientFactory).SendCommandAsync(
                 Properties.BaseUrl,
                 service,
@@ -430,13 +460,14 @@ namespace Emby.Dlna.PlayTo
                 return;
             }
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
+            var service = GetAvTransportService();
+
             await new DlnaHttpClient(_logger, _httpClientFactory)
                 .SendCommandAsync(
                     Properties.BaseUrl,
                     service,
                     command.Name,
-                    avCommands!.BuildPost(command, service.ServiceType, 1), // null checked above
+                    avCommands.BuildPost(command, service.ServiceType, 1),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -453,13 +484,14 @@ namespace Emby.Dlna.PlayTo
                 return;
             }
 
-            var service = GetAvTransportService() ?? throw new InvalidOperationException("Unable to find service");
+            var service = GetAvTransportService();
+
             await new DlnaHttpClient(_logger, _httpClientFactory)
                 .SendCommandAsync(
                     Properties.BaseUrl,
                     service,
                     command.Name,
-                    avCommands!.BuildPost(command, service.ServiceType, 1), // null checked above
+                    avCommands.BuildPost(command, service.ServiceType, 1),
                     cancellationToken: cancellationToken)
                 .ConfigureAwait(false);
 
@@ -468,7 +500,7 @@ namespace Emby.Dlna.PlayTo
             RestartTimer(true);
         }
 
-        private async void TimerCallback(object? sender)
+        private async void TimerCallback(object sender)
         {
             if (_disposed)
             {
@@ -591,7 +623,7 @@ namespace Emby.Dlna.PlayTo
                 Properties.BaseUrl,
                 service,
                 command.Name,
-                rendererCommands!.BuildPost(command, service.ServiceType), // null checked above
+                rendererCommands.BuildPost(command, service.ServiceType),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (result is null || result.Document is null)
@@ -641,7 +673,7 @@ namespace Emby.Dlna.PlayTo
                 Properties.BaseUrl,
                 service,
                 command.Name,
-                rendererCommands!.BuildPost(command, service.ServiceType), // null checked above
+                rendererCommands.BuildPost(command, service.ServiceType),
                 cancellationToken: cancellationToken).ConfigureAwait(false);
 
             if (result is null || result.Document is null)
@@ -696,7 +728,7 @@ namespace Emby.Dlna.PlayTo
             return null;
         }
 
-        private async Task<UBaseObject?> GetMediaInfo(TransportCommands avCommands, CancellationToken cancellationToken)
+        private async Task<UBaseObject> GetMediaInfo(TransportCommands avCommands, CancellationToken cancellationToken)
         {
             var command = avCommands.ServiceActions.FirstOrDefault(c => c.Name == "GetMediaInfo");
             if (command is null)
@@ -766,7 +798,7 @@ namespace Emby.Dlna.PlayTo
             return null;
         }
 
-        private async Task<(bool Success, UBaseObject? Track)> GetPositionInfo(TransportCommands avCommands, CancellationToken cancellationToken)
+        private async Task<(bool Success, UBaseObject Track)> GetPositionInfo(TransportCommands avCommands, CancellationToken cancellationToken)
         {
             var command = avCommands.ServiceActions.FirstOrDefault(c => c.Name == "GetPositionInfo");
             if (command is null)
@@ -839,7 +871,7 @@ namespace Emby.Dlna.PlayTo
                 return (true, null);
             }
 
-            XElement? uPnpResponse = null;
+            XElement uPnpResponse = null;
 
             try
             {
@@ -863,7 +895,7 @@ namespace Emby.Dlna.PlayTo
             return (true, uTrack);
         }
 
-        private XElement? ParseResponse(string xml)
+        private XElement ParseResponse(string xml)
         {
             // Handle different variations sent back by devices.
             try
@@ -897,7 +929,7 @@ namespace Emby.Dlna.PlayTo
             return null;
         }
 
-        private static UBaseObject CreateUBaseObject(XElement? container, string? trackUri)
+        private static UBaseObject CreateUBaseObject(XElement container, string trackUri)
         {
             ArgumentNullException.ThrowIfNull(container);
 
@@ -940,7 +972,7 @@ namespace Emby.Dlna.PlayTo
             return new string[4];
         }
 
-        private async Task<TransportCommands?> GetAVProtocolAsync(CancellationToken cancellationToken)
+        private async Task<TransportCommands> GetAVProtocolAsync(CancellationToken cancellationToken)
         {
             if (AvCommands is not null)
             {
@@ -972,7 +1004,7 @@ namespace Emby.Dlna.PlayTo
             return AvCommands;
         }
 
-        private async Task<TransportCommands?> GetRenderingProtocolAsync(CancellationToken cancellationToken)
+        private async Task<TransportCommands> GetRenderingProtocolAsync(CancellationToken cancellationToken)
         {
             if (RendererCommands is not null)
             {
@@ -1022,7 +1054,7 @@ namespace Emby.Dlna.PlayTo
             return baseUrl + url;
         }
 
-        public static async Task<Device?> CreateuPnpDeviceAsync(Uri url, IHttpClientFactory httpClientFactory, ILogger logger, CancellationToken cancellationToken)
+        public static async Task<Device> CreateuPnpDeviceAsync(Uri url, IHttpClientFactory httpClientFactory, ILogger logger, CancellationToken cancellationToken)
         {
             var ssdpHttpClient = new DlnaHttpClient(logger, httpClientFactory);
 
@@ -1255,7 +1287,7 @@ namespace Emby.Dlna.PlayTo
             }
 
             _timer = null;
-            Properties = null!;
+            Properties = null;
 
             _disposed = true;
         }

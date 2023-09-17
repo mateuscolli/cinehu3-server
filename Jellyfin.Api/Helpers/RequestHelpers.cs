@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
@@ -125,7 +125,7 @@ public static class RequestHelpers
             httpContext.User.GetVersion(),
             httpContext.User.GetDeviceId(),
             httpContext.User.GetDevice(),
-            httpContext.GetNormalizedRemoteIP().ToString(),
+            httpContext.GetNormalizedRemoteIp().ToString(),
             user).ConfigureAwait(false);
 
         if (session is null)

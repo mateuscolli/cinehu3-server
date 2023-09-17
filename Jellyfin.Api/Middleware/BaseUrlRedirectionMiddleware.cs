@@ -48,6 +48,8 @@ public class BaseUrlRedirectionMiddleware
         if (string.IsNullOrEmpty(localPath)
             || string.Equals(localPath, baseUrlPrefix, StringComparison.OrdinalIgnoreCase)
             || string.Equals(localPath, baseUrlPrefix + "/", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(localPath, baseUrlPrefix + "/web", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(localPath, baseUrlPrefix + "/web/", StringComparison.OrdinalIgnoreCase)
             || !localPath.StartsWith(baseUrlPrefix, StringComparison.OrdinalIgnoreCase)
            )
         {

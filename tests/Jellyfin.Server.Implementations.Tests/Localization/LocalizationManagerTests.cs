@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Emby.Server.Implementations.Localization;
@@ -100,7 +100,7 @@ namespace Jellyfin.Server.Implementations.Tests.Localization
             await localizationManager.LoadAll();
             var ratings = localizationManager.GetParentalRatings().ToList();
 
-            Assert.Equal(24, ratings.Count);
+            Assert.Equal(19, ratings.Count);
 
             var fsk = ratings.FirstOrDefault(x => x.Name.Equals("FSK-12", StringComparison.Ordinal));
             Assert.NotNull(fsk);

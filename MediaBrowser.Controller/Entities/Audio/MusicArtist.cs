@@ -59,7 +59,7 @@ namespace MediaBrowser.Controller.Entities.Audio
             {
                 if (IsAccessedByName)
                 {
-                    return Enumerable.Empty<BaseItem>();
+                    return new List<BaseItem>();
                 }
 
                 return base.Children;

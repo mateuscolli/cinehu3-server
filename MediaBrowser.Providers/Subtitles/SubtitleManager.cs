@@ -200,11 +200,6 @@ namespace MediaBrowser.Providers.Subtitles
                     saveFileName += ".forced";
                 }
 
-                if (response.IsHearingImpaired)
-                {
-                    saveFileName += ".sdh";
-                }
-
                 saveFileName += "." + response.Format.ToLowerInvariant();
 
                 if (saveInMediaFolder)

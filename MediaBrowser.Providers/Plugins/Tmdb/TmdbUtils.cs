@@ -11,8 +11,10 @@ namespace MediaBrowser.Providers.Plugins.Tmdb
     /// <summary>
     /// Utilities for the TMDb provider.
     /// </summary>
-    public static partial class TmdbUtils
+    public static class TmdbUtils
     {
+        private static readonly Regex _nonWords = new(@"[\W_]+", RegexOptions.Compiled);
+
         /// <summary>
         /// URL of the TMDb instance to use.
         /// </summary>
@@ -48,9 +50,6 @@ namespace MediaBrowser.Providers.Plugins.Tmdb
             PersonKind.Producer
         };
 
-        [GeneratedRegex(@"[\W_]+")]
-        private static partial Regex NonWordRegex();
-
         /// <summary>
         /// Cleans the name according to TMDb requirements.
         /// </summary>
@@ -59,7 +58,7 @@ namespace MediaBrowser.Providers.Plugins.Tmdb
         public static string CleanName(string name)
         {
             // TMDb expects a space separated list of words make sure that is the case
-            return NonWordRegex().Replace(name, " ");
+            return _nonWords.Replace(name, " ");
         }
 
         /// <summary>

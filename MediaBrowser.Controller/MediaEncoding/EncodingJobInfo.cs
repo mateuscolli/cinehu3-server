@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Jellyfin.Data.Entities;
-using Jellyfin.Data.Enums;
 using MediaBrowser.Model.Dlna;
 using MediaBrowser.Model.Drawing;
 using MediaBrowser.Model.Dto;
@@ -368,21 +367,22 @@ namespace MediaBrowser.Controller.MediaEncoding
         /// <summary>
         /// Gets the target video range type.
         /// </summary>
-        public VideoRangeType TargetVideoRangeType
+        public string TargetVideoRangeType
         {
             get
             {
                 if (BaseRequest.Static || EncodingHelper.IsCopyCodec(OutputVideoCodec))
                 {
-                    return VideoStream?.VideoRangeType ?? VideoRangeType.Unknown;
+                    return VideoStream?.VideoRangeType;
                 }
 
-                if (Enum.TryParse(GetRequestedRangeTypes(ActualOutputVideoCodec).FirstOrDefault() ?? "Unknown", true, out VideoRangeType requestedRangeType))
+                var requestedRangeType = GetRequestedRangeTypes(ActualOutputVideoCodec).FirstOrDefault();
+                if (!string.IsNullOrEmpty(requestedRangeType))
                 {
                     return requestedRangeType;
                 }
 
-                return VideoRangeType.Unknown;
+                return null;
             }
         }
 

@@ -1,8 +1,11 @@
+#nullable disable
+
 #pragma warning disable CA1068, CS1591
 
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -80,9 +83,9 @@ namespace MediaBrowser.Providers.MediaInfo
             CancellationToken cancellationToken)
             where T : Video
         {
-            BlurayDiscInfo? blurayDiscInfo = null;
+            BlurayDiscInfo blurayDiscInfo = null;
 
-            Model.MediaInfo.MediaInfo? mediaInfoResult = null;
+            Model.MediaInfo.MediaInfo mediaInfoResult = null;
 
             if (!item.IsShortcut || options.EnableRemoteContentProbe)
             {
@@ -128,7 +131,7 @@ namespace MediaBrowser.Providers.MediaInfo
                     var m2ts = _mediaEncoder.GetPrimaryPlaylistM2tsFiles(item.Path);
 
                     // Return if no playable .m2ts files are found
-                    if (blurayDiscInfo is null || blurayDiscInfo.Files.Length == 0 || m2ts.Count == 0)
+                    if (blurayDiscInfo.Files.Length == 0 || m2ts.Count == 0)
                     {
                         _logger.LogError("No playable .m2ts files found in Blu-ray structure, skipping FFprobe.");
                         return ItemUpdateType.MetadataImport;
@@ -189,13 +192,15 @@ namespace MediaBrowser.Providers.MediaInfo
         protected async Task Fetch(
             Video video,
             CancellationToken cancellationToken,
-            Model.MediaInfo.MediaInfo? mediaInfo,
-            BlurayDiscInfo? blurayInfo,
+            Model.MediaInfo.MediaInfo mediaInfo,
+            BlurayDiscInfo blurayInfo,
             MetadataRefreshOptions options)
         {
-            List<MediaStream> mediaStreams = new List<MediaStream>();
+            List<MediaStream> mediaStreams;
             IReadOnlyList<MediaAttachment> mediaAttachments;
             ChapterInfo[] chapters;
+
+            mediaStreams = new List<MediaStream>();
 
             // Add external streams before adding the streams from the file to preserve stream IDs on remote videos
             await AddExternalSubtitlesAsync(video, mediaStreams, options, cancellationToken).ConfigureAwait(false);
@@ -216,6 +221,18 @@ namespace MediaBrowser.Providers.MediaInfo
                 video.TotalBitrate = mediaInfo.Bitrate;
                 video.RunTimeTicks = mediaInfo.RunTimeTicks;
                 video.Size = mediaInfo.Size;
+
+                if (video.VideoType == VideoType.VideoFile)
+                {
+                    var extension = (Path.GetExtension(video.Path) ?? string.Empty).TrimStart('.');
+
+                    video.Container = extension;
+                }
+                else
+                {
+                    video.Container = null;
+                }
+
                 video.Container = mediaInfo.Container;
 
                 chapters = mediaInfo.Chapters ?? Array.Empty<ChapterInfo>();
@@ -226,7 +243,8 @@ namespace MediaBrowser.Providers.MediaInfo
             }
             else
             {
-                foreach (var mediaStream in video.GetMediaStreams())
+                var currentMediaStreams = video.GetMediaStreams();
+                foreach (var mediaStream in currentMediaStreams)
                 {
                     if (!mediaStream.IsExternal)
                     {
@@ -277,8 +295,8 @@ namespace MediaBrowser.Providers.MediaInfo
                 _itemRepo.SaveMediaAttachments(video.Id, mediaAttachments, cancellationToken);
             }
 
-            if (options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh
-                || options.MetadataRefreshMode == MetadataRefreshMode.Default)
+            if (options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh ||
+                options.MetadataRefreshMode == MetadataRefreshMode.Default)
             {
                 if (_config.Configuration.DummyChapterDuration > 0 && chapters.Length == 0 && mediaStreams.Any(i => i.Type == MediaStreamType.Video))
                 {
@@ -303,11 +321,11 @@ namespace MediaBrowser.Providers.MediaInfo
         {
             for (int i = 0; i < chapters.Length; i++)
             {
-                string? name = chapters[i].Name;
+                string name = chapters[i].Name;
                 // Check if the name is empty and/or if the name is a time
                 // Some ripping programs do that.
-                if (string.IsNullOrWhiteSpace(name)
-                    || TimeSpan.TryParse(name, out _))
+                if (string.IsNullOrWhiteSpace(name) ||
+                    TimeSpan.TryParse(name, out _))
                 {
                     chapters[i].Name = string.Format(
                         CultureInfo.InvariantCulture,
@@ -366,10 +384,15 @@ namespace MediaBrowser.Providers.MediaInfo
             // Use the ffprobe values if these are empty
             if (videoStream is not null)
             {
-                videoStream.BitRate = videoStream.BitRate.GetValueOrDefault() == 0 ? currentBitRate : videoStream.BitRate;
-                videoStream.Width = videoStream.Width.GetValueOrDefault() == 0 ? currentWidth : videoStream.Width;
-                videoStream.Height = videoStream.Height.GetValueOrDefault() == 0 ? currentHeight : videoStream.Height;
+                videoStream.BitRate = IsEmpty(videoStream.BitRate) ? currentBitRate : videoStream.BitRate;
+                videoStream.Width = IsEmpty(videoStream.Width) ? currentWidth : videoStream.Width;
+                videoStream.Height = IsEmpty(videoStream.Height) ? currentHeight : videoStream.Height;
             }
+        }
+
+        private bool IsEmpty(int? num)
+        {
+            return !num.HasValue || num.Value == 0;
         }
 
         /// <summary>
@@ -377,7 +400,7 @@ namespace MediaBrowser.Providers.MediaInfo
         /// </summary>
         /// <param name="path">The path.</param>
         /// <returns>VideoStream.</returns>
-        private BlurayDiscInfo? GetBDInfo(string path)
+        private BlurayDiscInfo GetBDInfo(string path)
         {
             ArgumentException.ThrowIfNullOrEmpty(path);
 
@@ -504,29 +527,32 @@ namespace MediaBrowser.Providers.MediaInfo
 
         private void FetchPeople(Video video, Model.MediaInfo.MediaInfo data, MetadataRefreshOptions options)
         {
-            if (video.IsLocked
-                || video.LockedFields.Contains(MetadataField.Cast)
-                || data.People.Length == 0)
-            {
-                return;
-            }
+            var replaceData = options.ReplaceAllMetadata;
 
-            if (options.ReplaceAllMetadata || _libraryManager.GetPeople(video).Count == 0)
+            if (!video.IsLocked && !video.LockedFields.Contains(MetadataField.Cast))
             {
-                var people = new List<PersonInfo>();
-
-                foreach (var person in data.People)
+                if (replaceData || _libraryManager.GetPeople(video).Count == 0)
                 {
-                    PeopleHelper.AddPerson(people, new PersonInfo
-                    {
-                        Name = person.Name,
-                        Type = person.Type,
-                        Role = person.Role
-                    });
-                }
+                    var people = new List<PersonInfo>();
 
-                _libraryManager.UpdatePeople(video, people);
+                    foreach (var person in data.People)
+                    {
+                        PeopleHelper.AddPerson(people, new PersonInfo
+                        {
+                            Name = person.Name,
+                            Type = person.Type,
+                            Role = person.Role
+                        });
+                    }
+
+                    _libraryManager.UpdatePeople(video, people);
+                }
             }
+        }
+
+        private SubtitleOptions GetOptions()
+        {
+            return _config.GetConfiguration<SubtitleOptions>("subtitles");
         }
 
         /// <summary>
@@ -549,7 +575,7 @@ namespace MediaBrowser.Providers.MediaInfo
             var enableSubtitleDownloading = options.MetadataRefreshMode == MetadataRefreshMode.Default ||
                                             options.MetadataRefreshMode == MetadataRefreshMode.FullRefresh;
 
-            var subtitleOptions = _config.GetConfiguration<SubtitleOptions>("subtitles");
+            var subtitleOptions = GetOptions();
 
             var libraryOptions = _libraryManager.GetLibraryOptions(video);
 
@@ -633,9 +659,9 @@ namespace MediaBrowser.Providers.MediaInfo
         /// </summary>
         /// <param name="video">The video.</param>
         /// <returns>An array of dummy chapters.</returns>
-        internal ChapterInfo[] CreateDummyChapters(Video video)
+        private ChapterInfo[] CreateDummyChapters(Video video)
         {
-            var runtime = video.RunTimeTicks.GetValueOrDefault();
+            var runtime = video.RunTimeTicks ?? 0;
 
             // Only process files with a runtime higher than 0 and lower than 12h. The latter are likely corrupted.
             if (runtime < 0 || runtime > TimeSpan.FromHours(12).Ticks)
@@ -645,30 +671,30 @@ namespace MediaBrowser.Providers.MediaInfo
                         CultureInfo.InvariantCulture,
                         "{0} has an invalid runtime of {1} minutes",
                         video.Name,
-                        TimeSpan.FromTicks(runtime).TotalMinutes));
+                        TimeSpan.FromTicks(runtime).Minutes));
             }
 
             long dummyChapterDuration = TimeSpan.FromSeconds(_config.Configuration.DummyChapterDuration).Ticks;
-            if (runtime <= dummyChapterDuration)
+            if (runtime > dummyChapterDuration)
             {
-                return Array.Empty<ChapterInfo>();
-            }
+                int chapterCount = (int)(runtime / dummyChapterDuration);
+                var chapters = new ChapterInfo[chapterCount];
 
-            int chapterCount = (int)(runtime / dummyChapterDuration);
-            var chapters = new ChapterInfo[chapterCount];
-
-            long currentChapterTicks = 0;
-            for (int i = 0; i < chapterCount; i++)
-            {
-                chapters[i] = new ChapterInfo
+                long currentChapterTicks = 0;
+                for (int i = 0; i < chapterCount; i++)
                 {
-                    StartPositionTicks = currentChapterTicks
-                };
+                    chapters[i] = new ChapterInfo
+                    {
+                        StartPositionTicks = currentChapterTicks
+                    };
 
-                currentChapterTicks += dummyChapterDuration;
+                    currentChapterTicks += dummyChapterDuration;
+                }
+
+                return chapters;
             }
 
-            return chapters;
+            return Array.Empty<ChapterInfo>();
         }
     }
 }

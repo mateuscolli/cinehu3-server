@@ -4,9 +4,9 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Linq;
 using System.Net;
-using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using MediaBrowser.Common.Net;
 
 namespace Rssdp.Infrastructure
 {
@@ -31,6 +31,8 @@ namespace Rssdp.Infrastructure
 
         private Random _Random;
 
+        private const string ServerVersion = "1.0";
+
         /// <summary>
         /// Default constructor.
         /// </summary>
@@ -40,9 +42,30 @@ namespace Rssdp.Infrastructure
             string osVersion,
             bool sendOnlyMatchedHost)
         {
-            ArgumentNullException.ThrowIfNull(communicationsServer);
-            ArgumentNullException.ThrowIfNullOrEmpty(osName);
-            ArgumentNullException.ThrowIfNullOrEmpty(osVersion);
+            if (communicationsServer == null)
+            {
+                throw new ArgumentNullException(nameof(communicationsServer));
+            }
+
+            if (osName == null)
+            {
+                throw new ArgumentNullException(nameof(osName));
+            }
+
+            if (osName.Length == 0)
+            {
+                throw new ArgumentException("osName cannot be an empty string.", nameof(osName));
+            }
+
+            if (osVersion == null)
+            {
+                throw new ArgumentNullException(nameof(osVersion));
+            }
+
+            if (osVersion.Length == 0)
+            {
+                throw new ArgumentException("osVersion cannot be an empty string.", nameof(osName));
+            }
 
             _SupportPnpRootDevice = true;
             _Devices = new List<SsdpRootDevice>();
@@ -56,13 +79,10 @@ namespace Rssdp.Infrastructure
             _OSVersion = osVersion;
             _sendOnlyMatchedHost = sendOnlyMatchedHost;
 
-            _CommsServer.BeginListeningForMulticast();
-
-            // Send alive notification once on creation
-            SendAllAliveNotifications(null);
+            _CommsServer.BeginListeningForBroadcasts();
         }
 
-        public void StartSendingAliveNotifications(TimeSpan interval)
+        public void StartBroadcastingAliveMessages(TimeSpan interval)
         {
             _RebroadcastAliveNotificationsTimer = new Timer(SendAllAliveNotifications, null, TimeSpan.FromSeconds(5), interval);
         }
@@ -78,9 +98,10 @@ namespace Rssdp.Infrastructure
         /// <param name="device">The <see cref="SsdpDevice"/> instance to add.</param>
         /// <exception cref="ArgumentNullException">Thrown if the <paramref name="device"/> argument is null.</exception>
         /// <exception cref="InvalidOperationException">Thrown if the <paramref name="device"/> contains property values that are not acceptable to the UPnP 1.0 specification.</exception>
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Performance", "CA1804:RemoveUnusedLocals", MessageId = "t", Justification = "Capture task to local variable suppresses compiler warning, but task is not really needed.")]
         public void AddDevice(SsdpRootDevice device)
         {
-            if (device is null)
+            if (device == null)
             {
                 throw new ArgumentNullException(nameof(device));
             }
@@ -116,7 +137,7 @@ namespace Rssdp.Infrastructure
         /// <exception cref="ArgumentNullException">Thrown if the <paramref name="device"/> argument is null.</exception>
         public async Task RemoveDevice(SsdpRootDevice device)
         {
-            if (device is null)
+            if (device == null)
             {
                 throw new ArgumentNullException(nameof(device));
             }
@@ -178,7 +199,7 @@ namespace Rssdp.Infrastructure
                 DisposeRebroadcastTimer();
 
                 var commsServer = _CommsServer;
-                if (commsServer is not null)
+                if (commsServer != null)
                 {
                     commsServer.RequestReceived -= this.CommsServer_RequestReceived;
                 }
@@ -187,7 +208,7 @@ namespace Rssdp.Infrastructure
                 Task.WaitAll(tasks);
 
                 _CommsServer = null;
-                if (commsServer is not null)
+                if (commsServer != null)
                 {
                     if (!commsServer.IsShared)
                     {
@@ -203,7 +224,7 @@ namespace Rssdp.Infrastructure
             string mx,
             string searchTarget,
             IPEndPoint remoteEndPoint,
-            IPAddress receivedOnlocalIPAddress,
+            IPAddress receivedOnlocalIpAddress,
             CancellationToken cancellationToken)
         {
             if (String.IsNullOrEmpty(searchTarget))
@@ -259,25 +280,27 @@ namespace Rssdp.Infrastructure
                     }
                     else if (searchTarget.Trim().StartsWith("uuid:", StringComparison.OrdinalIgnoreCase))
                     {
-                        devices = GetAllDevicesAsFlatEnumerable().Where(d => String.Compare(d.Uuid, searchTarget.Substring(5), StringComparison.OrdinalIgnoreCase) == 0).ToArray();
+                        devices = (from device in GetAllDevicesAsFlatEnumerable() where String.Compare(device.Uuid, searchTarget.Substring(5), StringComparison.OrdinalIgnoreCase) == 0 select device).ToArray();
                     }
                     else if (searchTarget.StartsWith("urn:", StringComparison.OrdinalIgnoreCase))
                     {
-                        devices = GetAllDevicesAsFlatEnumerable().Where(d => String.Compare(d.FullDeviceType, searchTarget, StringComparison.OrdinalIgnoreCase) == 0).ToArray();
+                        devices = (from device in GetAllDevicesAsFlatEnumerable() where String.Compare(device.FullDeviceType, searchTarget, StringComparison.OrdinalIgnoreCase) == 0 select device).ToArray();
                     }
                 }
 
-                if (devices is not null)
+                if (devices != null)
                 {
+                    var deviceList = devices.ToList();
                     // WriteTrace(String.Format("Sending {0} search responses", deviceList.Count));
 
-                    foreach (var device in devices)
+                    foreach (var device in deviceList)
                     {
                         var root = device.ToRootDevice();
-
-                        if (!_sendOnlyMatchedHost || root.Address.Equals(receivedOnlocalIPAddress))
+                        var source = new IPNetAddress(root.Address, root.PrefixLength);
+                        var destination = new IPNetAddress(remoteEndPoint.Address, root.PrefixLength);
+                        if (!_sendOnlyMatchedHost || source.NetworkAddress.Equals(destination.NetworkAddress))
                         {
-                            SendDeviceSearchResponses(device, remoteEndPoint, receivedOnlocalIPAddress, cancellationToken);
+                            SendDeviceSearchResponses(device, remoteEndPoint, receivedOnlocalIpAddress, cancellationToken);
                         }
                     }
                 }
@@ -292,22 +315,22 @@ namespace Rssdp.Infrastructure
         private void SendDeviceSearchResponses(
             SsdpDevice device,
             IPEndPoint endPoint,
-            IPAddress receivedOnlocalIPAddress,
+            IPAddress receivedOnlocalIpAddress,
             CancellationToken cancellationToken)
         {
-            bool isRootDevice = (device as SsdpRootDevice) is not null;
+            bool isRootDevice = (device as SsdpRootDevice) != null;
             if (isRootDevice)
             {
-                SendSearchResponse(SsdpConstants.UpnpDeviceTypeRootDevice, device, GetUsn(device.Udn, SsdpConstants.UpnpDeviceTypeRootDevice), endPoint, receivedOnlocalIPAddress, cancellationToken);
+                SendSearchResponse(SsdpConstants.UpnpDeviceTypeRootDevice, device, GetUsn(device.Udn, SsdpConstants.UpnpDeviceTypeRootDevice), endPoint, receivedOnlocalIpAddress, cancellationToken);
                 if (this.SupportPnpRootDevice)
                 {
-                    SendSearchResponse(SsdpConstants.PnpDeviceTypeRootDevice, device, GetUsn(device.Udn, SsdpConstants.PnpDeviceTypeRootDevice), endPoint, receivedOnlocalIPAddress, cancellationToken);
+                    SendSearchResponse(SsdpConstants.PnpDeviceTypeRootDevice, device, GetUsn(device.Udn, SsdpConstants.PnpDeviceTypeRootDevice), endPoint, receivedOnlocalIpAddress, cancellationToken);
                 }
             }
 
-            SendSearchResponse(device.Udn, device, device.Udn, endPoint, receivedOnlocalIPAddress, cancellationToken);
+            SendSearchResponse(device.Udn, device, device.Udn, endPoint, receivedOnlocalIpAddress, cancellationToken);
 
-            SendSearchResponse(device.FullDeviceType, device, GetUsn(device.Udn, device.FullDeviceType), endPoint, receivedOnlocalIPAddress, cancellationToken);
+            SendSearchResponse(device.FullDeviceType, device, GetUsn(device.Udn, device.FullDeviceType), endPoint, receivedOnlocalIpAddress, cancellationToken);
         }
 
         private string GetUsn(string udn, string fullDeviceType)
@@ -320,20 +343,22 @@ namespace Rssdp.Infrastructure
             SsdpDevice device,
             string uniqueServiceName,
             IPEndPoint endPoint,
-            IPAddress receivedOnlocalIPAddress,
+            IPAddress receivedOnlocalIpAddress,
             CancellationToken cancellationToken)
         {
+            var rootDevice = device.ToRootDevice();
+
+            // var additionalheaders = FormatCustomHeadersForResponse(device);
+
             const string header = "HTTP/1.1 200 OK";
 
-            var rootDevice = device.ToRootDevice();
             var values = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
             values["EXT"] = "";
             values["DATE"] = DateTime.UtcNow.ToString("r");
-            values["HOST"] = "239.255.255.250:1900";
             values["CACHE-CONTROL"] = "max-age = " + rootDevice.CacheLifetime.TotalSeconds;
             values["ST"] = searchTarget;
-            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, SsdpConstants.ServerVersion);
+            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, ServerVersion);
             values["USN"] = uniqueServiceName;
             values["LOCATION"] = rootDevice.Location.ToString();
 
@@ -342,9 +367,9 @@ namespace Rssdp.Infrastructure
             try
             {
                 await _CommsServer.SendMessage(
-                        Encoding.UTF8.GetBytes(message),
+                        System.Text.Encoding.UTF8.GetBytes(message),
                         endPoint,
-                        receivedOnlocalIPAddress,
+                        receivedOnlocalIpAddress,
                         cancellationToken)
                     .ConfigureAwait(false);
             }
@@ -467,7 +492,7 @@ namespace Rssdp.Infrastructure
             values["DATE"] = DateTime.UtcNow.ToString("r");
             values["CACHE-CONTROL"] = "max-age = " + rootDevice.CacheLifetime.TotalSeconds;
             values["LOCATION"] = rootDevice.Location.ToString();
-            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, SsdpConstants.ServerVersion);
+            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, ServerVersion);
             values["NTS"] = "ssdp:alive";
             values["NT"] = notificationType;
             values["USN"] = uniqueServiceName;
@@ -502,6 +527,7 @@ namespace Rssdp.Infrastructure
             return Task.WhenAll(tasks);
         }
 
+        [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA2204:Literals should be spelled correctly", MessageId = "byebye", Justification = "Correct value for this type of notification in SSDP.")]
         private Task SendByeByeNotification(SsdpDevice device, string notificationType, string uniqueServiceName, CancellationToken cancellationToken)
         {
             const string header = "NOTIFY * HTTP/1.1";
@@ -511,7 +537,7 @@ namespace Rssdp.Infrastructure
             // If needed later for non-server devices, these headers will need to be dynamic
             values["HOST"] = "239.255.255.250:1900";
             values["DATE"] = DateTime.UtcNow.ToString("r");
-            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, SsdpConstants.ServerVersion);
+            values["SERVER"] = string.Format(CultureInfo.InvariantCulture, "{0}/{1} UPnP/1.0 RSSDP/{2}", _OSName, _OSVersion, ServerVersion);
             values["NTS"] = "ssdp:byebye";
             values["NT"] = notificationType;
             values["USN"] = uniqueServiceName;
@@ -527,7 +553,7 @@ namespace Rssdp.Infrastructure
         {
             var timer = _RebroadcastAliveNotificationsTimer;
             _RebroadcastAliveNotificationsTimer = null;
-            if (timer is not null)
+            if (timer != null)
             {
                 timer.Dispose();
             }
@@ -552,7 +578,7 @@ namespace Rssdp.Infrastructure
         private string GetFirstHeaderValue(System.Net.Http.Headers.HttpRequestHeaders httpRequestHeaders, string headerName)
         {
             string retVal = null;
-            if (httpRequestHeaders.TryGetValues(headerName, out var values) && values is not null)
+            if (httpRequestHeaders.TryGetValues(headerName, out var values) && values != null)
             {
                 retVal = values.FirstOrDefault();
             }
@@ -564,7 +590,7 @@ namespace Rssdp.Infrastructure
 
         private void WriteTrace(string text)
         {
-            if (LogFunction is not null)
+            if (LogFunction != null)
             {
                 LogFunction(text);
             }
@@ -574,7 +600,7 @@ namespace Rssdp.Infrastructure
         private void WriteTrace(string text, SsdpDevice device)
         {
             var rootDevice = device as SsdpRootDevice;
-            if (rootDevice is not null)
+            if (rootDevice != null)
             {
                 WriteTrace(text + " " + device.DeviceType + " - " + device.Uuid + " - " + rootDevice.Location);
             }
@@ -600,7 +626,7 @@ namespace Rssdp.Infrastructure
                 // else if (!e.Message.Headers.Contains("MAN"))
                 //    WriteTrace("Ignoring search request - missing MAN header.");
                 // else
-                ProcessSearchRequest(GetFirstHeaderValue(e.Message.Headers, "MX"), GetFirstHeaderValue(e.Message.Headers, "ST"), e.ReceivedFrom, e.LocalIPAddress, CancellationToken.None);
+                ProcessSearchRequest(GetFirstHeaderValue(e.Message.Headers, "MX"), GetFirstHeaderValue(e.Message.Headers, "ST"), e.ReceivedFrom, e.LocalIpAddress, CancellationToken.None);
             }
         }
 

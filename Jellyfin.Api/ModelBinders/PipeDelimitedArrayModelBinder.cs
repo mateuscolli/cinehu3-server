@@ -77,7 +77,7 @@ public class PipeDelimitedArrayModelBinder : IModelBinder
         var typedValueIndex = 0;
         for (var i = 0; i < parsedValues.Length; i++)
         {
-            if (parsedValues[i] is not null)
+            if (parsedValues[i] != null)
             {
                 typedValues.SetValue(parsedValues[i], typedValueIndex);
                 typedValueIndex++;

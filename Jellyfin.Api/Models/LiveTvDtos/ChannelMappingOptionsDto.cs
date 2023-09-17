@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using MediaBrowser.Controller.LiveTv;
 using MediaBrowser.Model.Dto;
@@ -13,12 +13,12 @@ public class ChannelMappingOptionsDto
     /// <summary>
     /// Gets or sets list of tuner channels.
     /// </summary>
-    public required IReadOnlyList<TunerChannelMapping> TunerChannels { get; set; }
+    required public IReadOnlyList<TunerChannelMapping> TunerChannels { get; set; }
 
     /// <summary>
     /// Gets or sets list of provider channels.
     /// </summary>
-    public required IReadOnlyList<NameIdPair> ProviderChannels { get; set; }
+    required public IReadOnlyList<NameIdPair> ProviderChannels { get; set; }
 
     /// <summary>
     /// Gets or sets list of mappings.

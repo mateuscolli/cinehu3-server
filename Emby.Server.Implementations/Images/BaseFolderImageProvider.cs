@@ -31,7 +31,6 @@ namespace Emby.Server.Implementations.Images
             return _libraryManager.GetItemList(new InternalItemsQuery
             {
                 Parent = item,
-                Recursive = true,
                 DtoOptions = new DtoOptions(true),
                 ImageTypes = new ImageType[] { ImageType.Primary },
                 OrderBy = new (string, SortOrder)[]

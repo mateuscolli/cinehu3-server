@@ -24,7 +24,6 @@ using MediaBrowser.Controller.Drawing;
 using MediaBrowser.Controller.Dto;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Events;
-using MediaBrowser.Controller.Events.Authentication;
 using MediaBrowser.Controller.Events.Session;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
@@ -1463,7 +1462,7 @@ namespace Emby.Server.Implementations.Session
 
             if (user is null)
             {
-                await _eventManager.PublishAsync(new AuthenticationRequestEventArgs(request)).ConfigureAwait(false);
+                await _eventManager.PublishAsync(new GenericEventArgs<AuthenticationRequest>(request)).ConfigureAwait(false);
                 throw new AuthenticationException("Invalid username or password entered.");
             }
 
@@ -1499,7 +1498,7 @@ namespace Emby.Server.Implementations.Session
                 ServerId = _appHost.SystemId
             };
 
-            await _eventManager.PublishAsync(new AuthenticationResultEventArgs(returnResult)).ConfigureAwait(false);
+            await _eventManager.PublishAsync(new GenericEventArgs<AuthenticationResult>(returnResult)).ConfigureAwait(false);
             return returnResult;
         }
 
@@ -1509,20 +1508,35 @@ namespace Emby.Server.Implementations.Session
                 new DeviceQuery
                 {
                     DeviceId = deviceId,
-                    UserId = user.Id
+                    UserId = user.Id,
+                    Limit = 1
+                }).ConfigureAwait(false)).Items.FirstOrDefault();
+
+            var allExistingForDevice = (await _deviceManager.GetDevices(
+                new DeviceQuery
+                {
+                    DeviceId = deviceId
                 }).ConfigureAwait(false)).Items;
 
-            foreach (var auth in existing)
+            foreach (var auth in allExistingForDevice)
             {
-                try
+                if (existing is null || !string.Equals(auth.AccessToken, existing.AccessToken, StringComparison.Ordinal))
                 {
-                    // Logout any existing sessions for the user on this device
-                    await Logout(auth).ConfigureAwait(false);
+                    try
+                    {
+                        await Logout(auth).ConfigureAwait(false);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error while logging out.");
+                    }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Error while logging out existing session.");
-                }
+            }
+
+            if (existing is not null)
+            {
+                _logger.LogInformation("Reissuing access token: {Token}", existing.AccessToken);
+                return existing.AccessToken;
             }
 
             _logger.LogInformation("Creating new access token for user {0}", user.Id);

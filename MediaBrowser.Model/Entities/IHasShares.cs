@@ -1,4 +1,4 @@
-﻿namespace MediaBrowser.Model.Entities;
+namespace MediaBrowser.Model.Entities;
 
 /// <summary>
 /// Interface for access to shares.

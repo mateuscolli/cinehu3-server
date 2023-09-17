@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace Jellyfin.Api.Models.SubtitleDtos;
 
@@ -24,12 +24,6 @@ public class UploadSubtitleDto
     /// </summary>
     [Required]
     public bool IsForced { get; set; }
-
-    /// <summary>
-    /// Gets or sets a value indicating whether the subtitle is for hearing impaired.
-    /// </summary>
-    [Required]
-    public bool IsHearingImpaired { get; set; }
 
     /// <summary>
     /// Gets or sets the subtitle data.

@@ -140,5 +140,7 @@ namespace MediaBrowser.Model.System
 
         [Obsolete("This is no longer set")]
         public Architecture SystemArchitecture { get; set; } = Architecture.X64;
+
+        public string DiskSpaceInfo { get; set; }
     }
 }

@@ -11,6 +11,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -475,8 +476,8 @@ namespace Emby.Server.Implementations
             }
 
             var networkConfiguration = ConfigurationManager.GetNetworkConfiguration();
-            HttpPort = networkConfiguration.InternalHttpPort;
-            HttpsPort = networkConfiguration.InternalHttpsPort;
+            HttpPort = networkConfiguration.HttpServerPortNumber;
+            HttpsPort = networkConfiguration.HttpsPortNumber;
 
             // Safeguard against invalid configuration
             if (HttpPort == HttpsPort)
@@ -785,8 +786,8 @@ namespace Emby.Server.Implementations
             if (HttpPort != 0 && HttpsPort != 0)
             {
                 // Need to restart if ports have changed
-                if (networkConfiguration.InternalHttpPort != HttpPort
-                    || networkConfiguration.InternalHttpsPort != HttpsPort)
+                if (networkConfiguration.HttpServerPortNumber != HttpPort
+                    || networkConfiguration.HttpsPortNumber != HttpsPort)
                 {
                     if (ConfigurationManager.Configuration.IsPortAuthorized)
                     {
@@ -968,7 +969,8 @@ namespace Emby.Server.Implementations
                 ServerName = FriendlyName,
                 LocalAddress = GetSmartApiUrl(request),
                 SupportsLibraryMonitor = true,
-                PackageName = _startupOptions.PackageName
+                PackageName = _startupOptions.PackageName,
+                DiskSpaceInfo = GetDiskSpaceInfo()
             };
         }
 
@@ -995,7 +997,7 @@ namespace Emby.Server.Implementations
                 return PublishedServerUrl.Trim('/');
             }
 
-            string smart = NetManager.GetBindAddress(remoteAddr, out var port);
+            string smart = NetManager.GetBindInterface(remoteAddr, out var port);
             return GetLocalApiUrl(smart.Trim('/'), null, port);
         }
 
@@ -1006,9 +1008,7 @@ namespace Emby.Server.Implementations
             if (ConfigurationManager.GetNetworkConfiguration().EnablePublishedServerUriByRequest)
             {
                 int? requestPort = request.Host.Port;
-                if (requestPort is null
-                    || (requestPort == 80 && string.Equals(request.Scheme, "http", StringComparison.OrdinalIgnoreCase))
-                    || (requestPort == 443 && string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase)))
+                if ((requestPort == 80 && string.Equals(request.Scheme, "http", StringComparison.OrdinalIgnoreCase)) || (requestPort == 443 && string.Equals(request.Scheme, "https", StringComparison.OrdinalIgnoreCase)))
                 {
                     requestPort = -1;
                 }
@@ -1017,6 +1017,39 @@ namespace Emby.Server.Implementations
             }
 
             return GetSmartApiUrl(request.HttpContext.Connection.RemoteIpAddress ?? IPAddress.Loopback);
+        }
+
+        public string GetDiskSpaceInfo()
+        {
+            string drivePath = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "C" : "/";
+
+            DriveInfo drive = new DriveInfo(drivePath);
+
+            if (drive.IsReady)
+            {
+                double usageSpace = drive.TotalSize - drive.TotalFreeSpace;
+                double totalSpace = drive.TotalSize;
+                double percentege = Math.Round((usageSpace / totalSpace) * 100, 2);
+
+                return FormatBytes(usageSpace) + " / " + FormatBytes(totalSpace) + " (" + percentege + "%)";
+            }
+
+            return "-";
+        }
+
+        private string FormatBytes(double size)
+        {
+            string[] units = new string[] { "B", "KB", "MB", "GB", "TB", "PB" };
+            double mod = 1024.0;
+            int i = 0;
+
+            while (size >= mod)
+            {
+                size /= mod;
+                i++;
+            }
+
+            return Math.Round(size, 2) + units[i]; // with 2 decimals
         }
 
         /// <inheritdoc/>
@@ -1029,15 +1062,15 @@ namespace Emby.Server.Implementations
                 return PublishedServerUrl.Trim('/');
             }
 
-            string smart = NetManager.GetBindAddress(hostname, out var port);
+            string smart = NetManager.GetBindInterface(hostname, out var port);
             return GetLocalApiUrl(smart.Trim('/'), null, port);
         }
 
         /// <inheritdoc/>
-        public string GetApiUrlForLocalAccess(IPAddress ipAddress = null, bool allowHttps = true)
+        public string GetApiUrlForLocalAccess(IPObject hostname = null, bool allowHttps = true)
         {
             // With an empty source, the port will be null
-            var smart = NetManager.GetBindAddress(ipAddress, out _, true);
+            var smart = NetManager.GetBindInterface(hostname ?? IPHost.None, out _);
             var scheme = !allowHttps ? Uri.UriSchemeHttp : null;
             int? port = !allowHttps ? HttpPort : null;
             return GetLocalApiUrl(smart, scheme, port);
@@ -1190,7 +1223,7 @@ namespace Emby.Server.Implementations
                 }
             }
 
-            if (_sessionManager is not null)
+            if (_sessionManager != null)
             {
                 // used for closing websockets
                 foreach (var session in _sessionManager.Sessions)

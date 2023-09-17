@@ -1,3 +1,27 @@
+jellyfin-server (10.11.0-1) unstable; urgency=medium
+
+  * Removed user themes option, and added default theme option.
+
+ -- Jellyfin Packaging Team <packaging@jellyfin.org>  Tue, 24 May 2023 00:41:00 -0300
+
+jellyfin-server (10.10.0-3) unstable; urgency=medium
+
+  * Adjust error disk storage indicator on the dashboard.
+
+ -- Jellyfin Packaging Team <packaging@jellyfin.org>  Tue, 24 May 2023 00:41:00 -0300
+
+jellyfin-server (10.10.0-2) unstable; urgency=medium
+
+  * Adjust error disk storage indicator on the dashboard.
+
+ -- Jellyfin Packaging Team <packaging@jellyfin.org>  Tue, 24 May 2023 00:35:00 -0300
+
+jellyfin-server (10.10.0-1) unstable; urgency=medium
+
+  * New disk storage indicator on the dashboard.
+
+ -- Jellyfin Packaging Team <packaging@jellyfin.org>  Tue, 24 May 2023 17:56:00 -0300
+
 jellyfin-server (10.9.0-1) unstable; urgency=medium
 
   * New upstream version 10.9.0; release changelog at https://github.com/jellyfin/jellyfin/releases/tag/v10.9.0

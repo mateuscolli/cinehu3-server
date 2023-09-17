@@ -177,11 +177,9 @@ namespace MediaBrowser.Providers.MediaInfo
 
             var format = imageStream.Codec switch
             {
-                "bmp" => ImageFormat.Bmp,
-                "gif" => ImageFormat.Gif,
                 "mjpeg" => ImageFormat.Jpg,
                 "png" => ImageFormat.Png,
-                "webp" => ImageFormat.Webp,
+                "gif" => ImageFormat.Gif,
                 _ => ImageFormat.Jpg
             };
 
